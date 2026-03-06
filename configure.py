@@ -281,6 +281,7 @@ def run(stdscr) -> None:
                         key = curses.KEY_BTAB
                 # else: stray ESC, ignore
 
+
             if key in (curses.KEY_UP, ord("k")):
                 sl_elem_cursor = max(0, sl_elem_cursor - 1)
                 sl_status_msg = ""
@@ -417,7 +418,12 @@ def run(stdscr) -> None:
                         existing = [elems] if elems else []
                     # Resize to n lines
                     sl_lines = [list(existing[i]) if i < len(existing) else [] for i in range(n)]
+                    # Start on the first empty line (skip already-configured ones)
                     sl_current_line = 0
+                    for idx, ln in enumerate(sl_lines):
+                        if not ln:
+                            sl_current_line = idx
+                            break
                     sl_elem_cursor = 0
                     sl_elements = list_elements()
                     sl_status_msg = ""
