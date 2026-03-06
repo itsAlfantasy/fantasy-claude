@@ -185,7 +185,7 @@ def draw_statusline_editor(
     footer_row = h - 2
     if status_msg and footer_row < h:
         stdscr.addstr(footer_row - 1, 2, status_msg[:w - 2], curses.A_BOLD)
-    hint = "←/→ line   ↑↓ navigate   Enter toggle   s save   q cancel"
+    hint = "Tab/←/→ line   ↑↓ navigate   Enter toggle   s save   q cancel"
     if footer_row < h:
         stdscr.addstr(footer_row, 2, hint[:w - 2], curses.A_DIM)
 
@@ -263,12 +263,12 @@ def run(stdscr) -> None:
                 sl_elem_cursor = min(len(sl_elements) - 1, sl_elem_cursor + 1)
                 sl_status_msg = ""
 
-            elif key in (curses.KEY_LEFT, ord("h")):
+            elif key in (curses.KEY_LEFT, ord("h"), curses.KEY_BTAB):
                 sl_current_line = max(0, sl_current_line - 1)
                 sl_elem_cursor = 0
                 sl_status_msg = ""
 
-            elif key in (curses.KEY_RIGHT, ord("l")):
+            elif key in (curses.KEY_RIGHT, ord("l"), ord("\t")):  # Tab = next line
                 sl_current_line = min(len(sl_lines) - 1, sl_current_line + 1)
                 sl_elem_cursor = 0
                 sl_status_msg = ""
