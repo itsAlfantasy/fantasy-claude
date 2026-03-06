@@ -1,0 +1,10 @@
+{
+  "statusline": {
+    "elements": ["git-branch", "cwd", "datetime"]
+  },
+  "sounds": {
+    "on_error": "lego-break",
+    "on_stop": null,
+    "on_notification": null
+  }
+}
