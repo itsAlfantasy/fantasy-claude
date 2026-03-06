@@ -260,6 +260,27 @@ def run(stdscr) -> None:
             )
             key = stdscr.getch()
 
+            # Handle ESC sequences manually as fallback for broken keypad mode.
+            # Arrow keys send: ESC [ A/B/C/D. If keypad(True) isn't decoding
+            # them, getch() returns 27 (ESC) first.
+            if key == 27:
+                stdscr.nodelay(True)
+                k2 = stdscr.getch()
+                k3 = stdscr.getch()
+                stdscr.nodelay(False)
+                if k2 == ord("["):
+                    if k3 == ord("A"):
+                        key = curses.KEY_UP
+                    elif k3 == ord("B"):
+                        key = curses.KEY_DOWN
+                    elif k3 == ord("C"):
+                        key = curses.KEY_RIGHT
+                    elif k3 == ord("D"):
+                        key = curses.KEY_LEFT
+                    elif k3 == ord("Z"):
+                        key = curses.KEY_BTAB
+                # else: stray ESC, ignore
+
             if key in (curses.KEY_UP, ord("k")):
                 sl_elem_cursor = max(0, sl_elem_cursor - 1)
                 sl_status_msg = ""
