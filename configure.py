@@ -143,8 +143,13 @@ def draw_statusline_editor(
             preview = " | ".join(run_element(e) for e in line_elems)
         else:
             preview = "(empty)"
-        label = f"  Line {i + 1}:  {preview}"
-        stdscr.addstr(row, 2, label[:w - 2])
+        if i == current_line:
+            # Highlight the line currently being edited
+            label = f"> Line {i + 1}:  {preview}"
+            stdscr.addstr(row, 2, label[:w - 2], curses.A_BOLD)
+        else:
+            label = f"  Line {i + 1}:  {preview}"
+            stdscr.addstr(row, 2, label[:w - 2])
         row += 1
 
     row += 1
@@ -185,7 +190,7 @@ def draw_statusline_editor(
     footer_row = h - 2
     if status_msg and footer_row < h:
         stdscr.addstr(footer_row - 1, 2, status_msg[:w - 2], curses.A_BOLD)
-    hint = "Tab/←/→ line   ↑↓ navigate   Enter toggle   s save   q cancel"
+    hint = "1-9/Tab/←/→ line   ↑↓ navigate   Enter toggle   s save   q cancel"
     if footer_row < h:
         stdscr.addstr(footer_row, 2, hint[:w - 2], curses.A_DIM)
 
@@ -272,6 +277,13 @@ def run(stdscr) -> None:
                 sl_current_line = min(len(sl_lines) - 1, sl_current_line + 1)
                 sl_elem_cursor = 0
                 sl_status_msg = ""
+
+            elif ord("1") <= key <= ord("9"):
+                n = key - ord("1")  # key "1" → index 0
+                if n < len(sl_lines):
+                    sl_current_line = n
+                    sl_elem_cursor = 0
+                    sl_status_msg = ""
 
             elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
                 elem = sl_elements[sl_elem_cursor]
