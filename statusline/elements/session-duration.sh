@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 CLAUDE_DIR = os.path.expanduser("~/.claude/projects")
 files = glob.glob(f"{CLAUDE_DIR}/**/*.jsonl", recursive=True)
 if not files:
-    print("dur:--")
+    print("--")
     sys.exit()
 
 latest = max(files, key=os.path.getmtime)
@@ -25,7 +25,7 @@ with open(latest, errors="replace") as f:
             pass
 
 if not first_ts:
-    print("dur:--")
+    print("--")
     sys.exit()
 
 try:
@@ -35,9 +35,9 @@ try:
     h, rem = divmod(delta, 3600)
     m, s = divmod(rem, 60)
     if h > 0:
-        print(f"dur:{h}h{m:02d}m")
+        print(f"{h}h{m:02d}m")
     else:
-        print(f"dur:{m}m{s:02d}s")
+        print(f"{m}m{s:02d}s")
 except Exception:
-    print("dur:--")
+    print("--")
 PYEOF

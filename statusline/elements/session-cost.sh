@@ -7,7 +7,7 @@ import glob, json, os, sys
 CLAUDE_DIR = os.path.expanduser("~/.claude/projects")
 files = glob.glob(f"{CLAUDE_DIR}/**/*.jsonl", recursive=True)
 if not files:
-    print("cost:--")
+    print("--")
     sys.exit()
 
 latest = max(files, key=os.path.getmtime)

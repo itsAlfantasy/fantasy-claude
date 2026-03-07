@@ -9,7 +9,7 @@ CONTEXT_WINDOW = 200_000  # all current Claude models
 # Find the most recently modified JSONL
 files = glob.glob(f"{CLAUDE_DIR}/**/*.jsonl", recursive=True)
 if not files:
-    print("ctx:--%")
+    print("--%")
     sys.exit()
 
 latest = max(files, key=os.path.getmtime)
@@ -27,7 +27,7 @@ with open(latest, errors="replace") as f:
             pass
 
 if not last_usage:
-    print("ctx:--%")
+    print("--%")
     sys.exit()
 
 total = (
@@ -36,5 +36,5 @@ total = (
     + last_usage.get("cache_read_input_tokens", 0)
 )
 pct = round(total / CONTEXT_WINDOW * 100)
-print(f"ctx:{pct}%")
+print(f"{pct}%")
 PYEOF
