@@ -19,7 +19,20 @@ Then restart Claude Code.
 
 ## Configuration
 
-Edit `config.json` to customize:
+### Interactive configurator
+
+Run the TUI configurator to change settings without editing JSON:
+
+```bash
+bash configure.sh
+```
+
+Use `↑↓` to navigate, `Enter` to select, `←` to go back, `q` to quit.
+Changes are written to `config.json` immediately on confirmation.
+
+### Manual config
+
+Edit `config.json` directly to customize:
 
 ```json
 {
