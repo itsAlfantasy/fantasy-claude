@@ -1,2 +1,2 @@
 #!/bin/bash
-echo " $(pwd | sed "s|$HOME|~|")"
+echo "$(pwd | sed "s|$HOME|~|")"

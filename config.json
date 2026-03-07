@@ -1,6 +1,81 @@
 {
   "statusline": {
-    "elements": ["git-branch", "cwd", "datetime"]
+    "lines": [
+      [
+        "cwd",
+        "git-branch",
+        "battery",
+        "session-duration"
+      ],
+      [
+        "context-pct",
+        "session-cost",
+        "burn-rate",
+        "usage-5h"
+      ]
+    ],
+    "element_settings": {
+      "burn-rate": {
+        "emoji": true,
+        "label": false,
+        "color": "orange"
+      },
+      "cwd": {
+        "emoji": true,
+        "label": false,
+        "color": null
+      },
+      "git-branch": {
+        "emoji": true,
+        "label": false,
+        "color": null
+      },
+      "battery": {
+        "emoji": true,
+        "label": false,
+        "color": null,
+        "bar": "mono"
+      },
+      "context-pct": {
+        "emoji": false,
+        "label": true,
+        "color": null,
+        "bar": "multi"
+      },
+      "datetime": {
+        "emoji": true,
+        "label": false,
+        "color": null
+      },
+      "reset-time": {
+        "emoji": true,
+        "label": false,
+        "color": null
+      },
+      "session-cost": {
+        "emoji": true,
+        "label": false,
+        "color": null
+      },
+      "session-duration": {
+        "emoji": true,
+        "label": false,
+        "color": null
+      },
+      "usage-5h": {
+        "emoji": true,
+        "label": true,
+        "color": "green",
+        "bar": "off"
+      },
+      "model": {
+        "emoji": true,
+        "label": false,
+        "color": null,
+        "bar": "off",
+        "emoji_set": 2
+      }
+    }
   },
   "sounds": {
     "on_error": "lego-break",
