@@ -33,12 +33,18 @@ get_multi_color() {
     esac
 }
 
+SEPARATOR_ANSI=""
+
 flush_line() {
     if [ ${#current_parts[@]} -gt 0 ]; then
-        local old_ifs="$IFS"
-        IFS=' | '
-        echo "${current_parts[*]}"
-        IFS="$old_ifs"
+        local sep=" | "
+        [ -n "$SEPARATOR_ANSI" ] && sep=$'\033'"[${SEPARATOR_ANSI}m | "$'\033'"[0m"
+        local result="" i
+        for ((i=0; i<${#current_parts[@]}; i++)); do
+            [ $i -gt 0 ] && result+="$sep"
+            result+="${current_parts[$i]}"
+        done
+        echo "$result"
     fi
 }
 
@@ -55,6 +61,8 @@ while IFS= read -r raw_line; do
     ansi_code=$(printf '%s' "$raw_line" | cut -f3)
     bar_mode=$(printf '%s' "$raw_line" | cut -f4)
     bar_rule=$(printf '%s' "$raw_line" | cut -f5)
+
+    if [ "$element" = "__sep__" ]; then SEPARATOR_ANSI="$ansi_code"; continue; fi
 
     script="$ELEMENTS_DIR/$element.sh"
     if [ -x "$script" ]; then
@@ -107,6 +115,13 @@ EMOJIS = {
     'context-pct': '\U0001f4cb',
     'session-duration': '\u23f1',
     'session-cost': '\U0001f4b0',
+    'github-repo': '\U0001f4cd',
+    'mood': '\U0001f3ad',
+    'streak': '\U0001f4c8',
+    'pomodoro': '\U0001f345',
+    'file-entropy': '\U0001f500',
+    'moon-phase': '\U0001f319',
+    'haiku': '\U0001f4dc',
 }
 LABELS = {
     'battery': 'bat',
@@ -119,6 +134,13 @@ LABELS = {
     'context-pct': 'ctx',
     'session-duration': 'dur',
     'session-cost': 'cost',
+    'github-repo': 'repo',
+    'mood': 'mood',
+    'streak': 'streak',
+    'pomodoro': 'pomo',
+    'file-entropy': 'files',
+    'moon-phase': 'phase',
+    'haiku': 'haiku',
 }
 COLORS = {
     'green': '32', 'cyan': '36', 'red': '31', 'yellow': '33',
@@ -168,6 +190,10 @@ if lines is None:
     elems = sl.get('elements', [])
     lines = [elems] if elems else []
 settings = sl.get('element_settings', {})
+default_color = COLORS.get(sl.get('default_color') or '', '')
+sep_color = COLORS.get(sl.get('separator_color') or '', '')
+if sep_color:
+    print(f'__sep__\t\t{sep_color}\t\t')
 for i, line in enumerate(lines):
     if i > 0:
         print('')  # blank separator
@@ -187,7 +213,7 @@ for i, line in enumerate(lines):
             l = LABELS.get(elem, '')
             if l: parts.append(l)
         prefix = ' '.join(parts) + ' ' if parts else ''
-        color = COLORS.get(s.get('color', ''), '')
+        color = COLORS.get(s.get('color') or '', '') or default_color
         bar_mode = s.get('bar', 'off') or 'off'
         bar_rule = BAR_ELEMENTS.get(elem, '')
         print(f'{elem}\t{prefix}\t{color}\t{bar_mode}\t{bar_rule}')
