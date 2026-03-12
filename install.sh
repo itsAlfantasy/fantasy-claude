@@ -11,6 +11,10 @@ echo "Installing claude-hooks from $REPO_DIR"
 chmod +x "$REPO_DIR/statusline/statusline.sh"
 chmod +x "$REPO_DIR/statusline/elements/"*.sh
 chmod +x "$REPO_DIR/hooks/sounds.sh"
+chmod +x "$REPO_DIR/hooks/notify-permission.sh"
+chmod +x "$REPO_DIR/hooks/notify-idle.sh"
+chmod +x "$REPO_DIR/hooks/notify-elicitation.sh"
+chmod +x "$REPO_DIR/hooks/notify-auth.sh"
 
 # Create ~/.claude if needed
 mkdir -p "$CLAUDE_DIR"

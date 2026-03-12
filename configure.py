@@ -30,6 +30,24 @@ SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
 SESSION_HOOK_SCRIPT = Path.home() / ".claude" / "hooks" / "session-git-cleanup.sh"
 INTEGRATIONS_PATH = Path.home() / ".claude" / "integrations.json"
 
+NOTIFY_SCRIPTS = {
+    "permission_prompt": REPO_DIR / "hooks" / "notify-permission.sh",
+    "idle_prompt":       REPO_DIR / "hooks" / "notify-idle.sh",
+    "elicitation_dialog": REPO_DIR / "hooks" / "notify-elicitation.sh",
+    "auth_success":      REPO_DIR / "hooks" / "notify-auth.sh",
+}
+
+NOTIFY_DESCRIPTION = [
+    "Sends a notification when Claude Code needs your",
+    "input. Uses iTerm2 native alerts on macOS or",
+    "notify-send on Linux.",
+    "",
+    "To avoid duplicate notifications, disable Claude",
+    "Code's built-in notifications: run /config, scroll",
+    "down to Notifications, set to Disabled, then",
+    "restart your Claude Code sessions.",
+]
+
 GIT_CLEANUP_DESCRIPTION = [
     "Keeps local branches in sync with remote on each",
     "session start. Fetches all remotes, prunes stale",
@@ -457,6 +475,113 @@ def toggle_git_cleanup(enable: bool) -> None:
     hooks["SessionStart"] = session_hooks
     settings["hooks"] = hooks
     _save_settings(settings)
+
+
+NOTIFY_LABELS = {
+    "permission_prompt": "🔐 Permission prompt",
+    "idle_prompt":       "💤 Idle prompt",
+    "elicitation_dialog": "❓ Elicitation dialog",
+    "auth_success":      "✅ Auth success",
+}
+
+
+def get_notify_states() -> dict[str, bool]:
+    """Return enabled state for each notification type."""
+    settings = _load_settings()
+    hooks = settings.get("hooks", {})
+    states = {k: False for k in NOTIFY_SCRIPTS}
+    for entry in hooks.get("Notification", []):
+        matcher = entry.get("matcher", "")
+        for h in (entry.get("hooks", []) if isinstance(entry, dict) else []):
+            cmd = h.get("command", "")
+            if "notify-" in cmd and cmd.endswith(".sh") and matcher in NOTIFY_SCRIPTS:
+                states[matcher] = True
+    return states
+
+
+def is_notify_enabled() -> bool:
+    return any(get_notify_states().values())
+
+
+def toggle_notify_type(ntype: str, enable: bool) -> None:
+    """Toggle a single notification type on or off."""
+    settings = _load_settings()
+    hooks = settings.setdefault("hooks", {})
+    notif_hooks = hooks.get("Notification", [])
+
+    # Remove existing entry for this type (and legacy notify.sh)
+    notif_hooks = [
+        e for e in notif_hooks
+        if not (
+            e.get("matcher", "") == ntype
+            and any(
+                ("notify-" in h.get("command", "") or "notify.sh" in h.get("command", ""))
+                for h in (e.get("hooks", []) if isinstance(e, dict) else [])
+            )
+        )
+    ]
+
+    if enable:
+        script = NOTIFY_SCRIPTS[ntype]
+        notif_hooks.append({
+            "matcher": ntype,
+            "hooks": [{"type": "command", "command": f"bash {script}"}]
+        })
+
+    hooks["Notification"] = notif_hooks
+    settings["hooks"] = hooks
+    _save_settings(settings)
+
+
+def draw_notify_config(stdscr, states: dict[str, bool], cursor: int) -> None:
+    stdscr.erase()
+    h, w = stdscr.getmaxyx()
+
+    header = "  claude-hooks · Hooks › Notifications  "
+    stdscr.addstr(0, 0, header[:w], curses.A_BOLD)
+    stdscr.addstr(1, 0, "─" * min(w, 60))
+
+    row = 3
+    for line in NOTIFY_DESCRIPTION:
+        if row >= h - 4:
+            break
+        stdscr.addstr(row, 4, line[:w - 4], curses.A_DIM)
+        row += 1
+
+    row += 1
+    ntypes = list(NOTIFY_SCRIPTS.keys())
+    for i, ntype in enumerate(ntypes):
+        if row >= h - 4:
+            break
+        marker = "x" if states.get(ntype, False) else " "
+        label = NOTIFY_LABELS[ntype]
+        text = f"[{marker}] {label}"
+        attr = curses.A_REVERSE if i == cursor else 0
+        stdscr.addstr(row, 4, text[:w - 4], attr)
+        row += 1
+
+    # Warning if tool not found (Linux only)
+    row += 1
+    if row < h - 3 and platform.system() != "Darwin":
+        if not _check_command("notify-send"):
+            stdscr.addstr(row, 4, "⚠ notify-send not found"[:w - 4], curses.A_DIM)
+
+    footer_row = h - 2
+    if footer_row > row + 1:
+        stdscr.addstr(footer_row - 1, 2, "─" * min(w - 4, 56))
+    hint = "↑↓ navigate   Enter toggle   ← back   q quit"
+    if footer_row < h:
+        stdscr.addstr(footer_row, 2, hint[:w - 2], curses.A_DIM)
+
+    stdscr.refresh()
+
+
+def _check_command(name: str) -> bool:
+    try:
+        subprocess.run(["which", name], capture_output=True, check=True)
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
 
 
 def draw_git_cleanup_config(stdscr, enabled: bool) -> None:
@@ -1202,6 +1327,10 @@ def run(stdscr) -> None:
                 items.append(f"{label:<22} [{val}]")
             gc_status = "enabled" if is_git_cleanup_enabled() else "disabled"
             items.append(f"{'Session Git Cleanup':<22} [{gc_status}]")
+            nf_states = get_notify_states()
+            nf_count = sum(nf_states.values())
+            notify_status = f"{nf_count}/{len(nf_states)}" if nf_count else "disabled"
+            items.append(f"{'Notifications':<22} [{notify_status}]")
             hint = "↑↓ navigate   Enter select   ← back   q quit"
 
         elif screen.startswith("sound_picker:"):
@@ -1651,6 +1780,42 @@ def run(stdscr) -> None:
 
             continue
 
+        elif screen == "notify_config":
+            nf_states = get_notify_states()
+            ntypes = list(NOTIFY_SCRIPTS.keys())
+            n_items = len(ntypes)
+            draw_notify_config(stdscr, nf_states, cursor)
+            key = stdscr.getch()
+
+            _bare_esc = False
+            if key == 27:
+                stdscr.nodelay(True)
+                k2 = stdscr.getch()
+                k3 = stdscr.getch()
+                stdscr.nodelay(False)
+                if k2 == ord("["):
+                    if k3 == ord("A"):
+                        key = curses.KEY_UP
+                    elif k3 == ord("B"):
+                        key = curses.KEY_DOWN
+                    elif k3 == ord("D"):
+                        key = curses.KEY_LEFT
+                else:
+                    _bare_esc = True
+
+            if key == curses.KEY_UP:
+                cursor = (cursor - 1) % n_items
+            elif key == curses.KEY_DOWN:
+                cursor = (cursor + 1) % n_items
+            elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
+                ntype = ntypes[cursor]
+                toggle_notify_type(ntype, not nf_states[ntype])
+            elif _bare_esc or key in (ord("q"), curses.KEY_LEFT):
+                if stack:
+                    screen, cursor = stack.pop()
+
+            continue
+
         elif screen == "integrations":
             title = "Integrations"
             items = ["Obsidian"]
@@ -1724,10 +1889,15 @@ def run(stdscr) -> None:
                         cursor = sounds.index(current)
                     except ValueError:
                         cursor = 0
-                else:
+                elif cursor == len(HOOKS_ITEMS):
                     # Session Git Cleanup item
                     stack.append((screen, cursor))
                     screen = "git_cleanup_config"
+                    cursor = 0
+                elif cursor == len(HOOKS_ITEMS) + 1:
+                    # Notifications item
+                    stack.append((screen, cursor))
+                    screen = "notify_config"
                     cursor = 0
 
             elif screen.startswith("sound_picker:"):
