@@ -1,17 +1,17 @@
 {
   "statusline": {
+    "default_color": null,
+    "separator_color": null,
     "lines": [
       [
+        "model",
         "cwd",
-        "git-branch",
-        "battery",
-        "session-duration"
+        "git-branch"
       ],
       [
         "context-pct",
-        "session-cost",
         "burn-rate",
-        "usage-5h"
+        "session-cost"
       ]
     ],
     "element_settings": {
@@ -23,12 +23,15 @@
       "cwd": {
         "emoji": true,
         "label": false,
-        "color": null
+        "color": null,
+        "bar": "off",
+        "basename_only": true
       },
       "git-branch": {
         "emoji": true,
         "label": false,
-        "color": null
+        "color": null,
+        "bar": "off"
       },
       "battery": {
         "emoji": true,
@@ -37,9 +40,9 @@
         "bar": "mono"
       },
       "context-pct": {
-        "emoji": false,
-        "label": true,
-        "color": null,
+        "emoji": true,
+        "label": false,
+        "color": "orange",
         "bar": "multi"
       },
       "datetime": {
@@ -55,7 +58,8 @@
       "session-cost": {
         "emoji": true,
         "label": false,
-        "color": null
+        "color": "orange",
+        "bar": "off"
       },
       "session-duration": {
         "emoji": true,
@@ -63,10 +67,10 @@
         "color": null
       },
       "usage-5h": {
-        "emoji": true,
+        "emoji": false,
         "label": true,
         "color": "green",
-        "bar": "off"
+        "bar": "multi"
       },
       "model": {
         "emoji": true,
@@ -74,6 +78,52 @@
         "color": null,
         "bar": "off",
         "emoji_set": 2
+      },
+      "github-repo": {
+        "emoji": true,
+        "label": false,
+        "color": null,
+        "bar": "off"
+      },
+      "mood": {
+        "emoji": false,
+        "label": false,
+        "color": null,
+        "bar": "off",
+        "mood_set": 1
+      },
+      "streak": {
+        "emoji": true,
+        "label": false,
+        "color": null,
+        "bar": "off",
+        "show_unit": true
+      },
+      "pomodoro": {
+        "emoji": true,
+        "label": false,
+        "color": null,
+        "bar": "off",
+        "duration": 20
+      },
+      "file-entropy": {
+        "emoji": true,
+        "label": false,
+        "color": null,
+        "bar": "off"
+      },
+      "moon-phase": {
+        "emoji": false,
+        "label": false,
+        "color": null,
+        "bar": "off",
+        "show_name": true
+      },
+      "haiku": {
+        "emoji": false,
+        "label": false,
+        "color": null,
+        "bar": "off"
       }
     }
   },
