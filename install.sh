@@ -5,7 +5,8 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_DIR="$HOME/.claude"
 SETTINGS="$CLAUDE_DIR/settings.json"
 
-echo "Installing claude-hooks from $REPO_DIR"
+VERSION=$(cat "$REPO_DIR/VERSION" 2>/dev/null || echo "unknown")
+echo "Installing claude-hooks v$VERSION from $REPO_DIR"
 
 # Make all scripts executable
 chmod +x "$REPO_DIR/statusline/statusline.sh"

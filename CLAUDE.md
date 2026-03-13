@@ -52,6 +52,23 @@ Patches `~/.claude/settings.json` to register:
 - `statusLine`: points to `statusline/statusline.sh`
 - Hooks: `PostToolUse`, `Stop`, `Notification` → `hooks/sounds.sh`
 
+## Development & Branch Workflow
+
+Changes to existing scripts and `config.json` are **live immediately** — no reinstall needed. See `DEVELOPMENT.md` for the full workflow.
+
+### Modifying `config.json`
+**Always warn the user before editing `config.json`**, because:
+- It is the single source of truth for statusline layout and sounds
+- Changes take effect immediately on the next statusline tick
+- Switching git branches replaces `config.json` too — a branch with a different layout can break the statusline if referenced element scripts don't exist on that branch
+
+When editing `config.json`, tell the user what will change and confirm before writing.
+
+### Branch switching side effects
+When the user switches branches, all scripts and `config.json` change instantly. Watch for:
+- Elements referenced in `config.json` that don't exist as `.sh` files on the new branch → silent failure or error
+- New hooks on a branch that aren't registered in `settings.json` → hook never fires (requires `bash install.sh`)
+
 ## Key Constants & Paths
 
 - Context window hard-coded to `200_000` tokens in `context-pct.sh`
