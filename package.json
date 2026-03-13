@@ -21,8 +21,5 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/itsAlfantasy/fantasy-claude"
-  },
-  "dependencies": {
-    "fantasy-claude": "^1.0.3"
   }
 }
