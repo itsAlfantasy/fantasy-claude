@@ -9,6 +9,7 @@ import unicodedata
 from pathlib import Path
 
 REPO_DIR = Path(__file__).parent
+VERSION = (REPO_DIR / "VERSION").read_text().strip() if (REPO_DIR / "VERSION").exists() else "unknown"
 
 EVENT_DIRS = {
     "on_error": "sounds/error",
@@ -742,7 +743,7 @@ def draw_screen(stdscr, title: str, items: list[str], cursor: int, hint: str = "
     h, w = stdscr.getmaxyx()
 
     # Header
-    header = f"  claude-hooks · {title}  "
+    header = f"  claude-hooks v{VERSION} · {title}  "
     stdscr.addstr(0, 0, header[:w], curses.A_BOLD)
     stdscr.addstr(1, 0, "─" * min(w, 60))
 

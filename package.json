@@ -1,0 +1,25 @@
+{
+  "name": "fantasy-claude",
+  "version": "1.0.0",
+  "description": "Statusline and sound hooks for Claude Code",
+  "bin": {
+    "fantasy-claude": "./cli.sh",
+    "fanclaude": "./cli.sh"
+  },
+  "files": [
+    "statusline/",
+    "hooks/",
+    "sounds/",
+    "config.json",
+    "configure.py",
+    "configure.sh",
+    "install.sh",
+    "cli.sh",
+    "VERSION"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/itsAlfantasy/fantasy-claude"
+  }
+}
