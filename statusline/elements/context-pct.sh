@@ -1,6 +1,7 @@
 #!/bin/bash
 # Context window usage % from the most recent Claude Code session JSONL
-python3 - << 'PYEOF'
+source "$(dirname "${BASH_SOURCE[0]}")/../../lib/python.sh"
+$PYTHON_BIN - << 'PYEOF'
 import glob, json, os, sys
 
 CLAUDE_DIR = os.path.expanduser("~/.claude/projects")

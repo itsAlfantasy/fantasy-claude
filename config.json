@@ -12,6 +12,11 @@
         "context-pct",
         "burn-rate",
         "session-cost"
+      ],
+      [
+        "streak",
+        "usage-5h",
+        "reset-time"
       ]
     ],
     "element_settings": {
@@ -67,10 +72,10 @@
         "color": null
       },
       "usage-5h": {
-        "emoji": false,
+        "emoji": true,
         "label": true,
-        "color": "green",
-        "bar": "multi"
+        "color": null,
+        "bar": "off"
       },
       "model": {
         "emoji": true,

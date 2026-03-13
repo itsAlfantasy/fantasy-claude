@@ -1,7 +1,8 @@
 #!/bin/bash
 # Notification hook for permission_prompt events
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/python.sh"
 input=$(cat)
-msg=$(echo "$input" | python3 -c "
+msg=$(echo "$input" | $PYTHON_BIN -c "
 import sys, json
 try:
     print(json.load(sys.stdin).get('message', 'Claude needs your permission'))

@@ -1,5 +1,6 @@
 #!/bin/bash
-python3 - << 'PYEOF'
+source "$(dirname "${BASH_SOURCE[0]}")/../../lib/python.sh"
+$PYTHON_BIN - << 'PYEOF'
 import glob, os, json
 claude_dir = os.path.expanduser('~/.claude/projects')
 files = glob.glob(f'{claude_dir}/**/*.jsonl', recursive=True)

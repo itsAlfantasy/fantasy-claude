@@ -1,5 +1,6 @@
 #!/bin/bash
-python3 - << 'PYEOF'
+source "$(dirname "${BASH_SOURCE[0]}")/../../lib/python.sh"
+$PYTHON_BIN - << 'PYEOF'
 from datetime import date
 import hashlib
 LINE1 = [

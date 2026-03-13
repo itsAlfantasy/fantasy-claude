@@ -8,6 +8,30 @@ SETTINGS="$CLAUDE_DIR/settings.json"
 VERSION=$(cat "$REPO_DIR/VERSION" 2>/dev/null || echo "unknown")
 echo "Installing claude-hooks v$VERSION from $REPO_DIR"
 
+detect_python() {
+  local candidates=("python3.13" "python3.12" "python3.11" "python3.10" "python3.9" "python3.8" "python3.7" "python3.6" "python3" "python")
+  for candidate in "${candidates[@]}"; do
+    if command -v "$candidate" &>/dev/null; then
+      local ver
+      ver=$("$candidate" -c "import sys; v=sys.version_info; print(v.major*100+v.minor)" 2>/dev/null)
+      if [ -n "$ver" ] && [ "$ver" -ge 306 ]; then
+        command -v "$candidate"
+        return 0
+      fi
+    fi
+  done
+  return 1
+}
+
+echo "Detecting Python 3.6+..."
+PYTHON_PATH=$(detect_python) || {
+  echo "ERROR: Python 3.6+ not found."
+  echo "Install Python 3 from https://www.python.org/downloads/ and re-run install.sh"
+  exit 1
+}
+echo "Using Python: $PYTHON_PATH ($("$PYTHON_PATH" --version))"
+echo "$PYTHON_PATH" > "$REPO_DIR/.python_bin"
+
 # Make all scripts executable
 chmod +x "$REPO_DIR/statusline/statusline.sh"
 chmod +x "$REPO_DIR/statusline/elements/"*.sh
@@ -25,7 +49,7 @@ if [ ! -f "$SETTINGS" ]; then
     echo "{}" > "$SETTINGS"
 fi
 
-python3 - <<EOF
+"$PYTHON_PATH" - <<EOF
 import json
 
 settings_path = "$SETTINGS"

@@ -1,6 +1,7 @@
 #!/bin/bash
 # Duration of the current Claude Code session from its JSONL
-python3 - << 'PYEOF'
+source "$(dirname "${BASH_SOURCE[0]}")/../../lib/python.sh"
+$PYTHON_BIN - << 'PYEOF'
 import glob, json, os, sys
 from datetime import datetime, timezone
 

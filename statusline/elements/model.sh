@@ -1,6 +1,7 @@
 #!/bin/bash
 # Current Claude model from the most recent session JSONL
-python3 - << 'PYEOF'
+source "$(dirname "${BASH_SOURCE[0]}")/../../lib/python.sh"
+$PYTHON_BIN - << 'PYEOF'
 import glob, json, os, re, sys
 
 CLAUDE_DIR = os.path.expanduser("~/.claude/projects")

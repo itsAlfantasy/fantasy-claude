@@ -1,11 +1,12 @@
 #!/bin/bash
 # Hook script for notifications when Claude Code needs user input.
 # Uses iTerm2 OSC 9 escape sequence on macOS, notify-send on Linux.
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/python.sh"
 
 input=$(cat)
 
 # Build notification message with emoji prefix based on type
-message=$(echo "$input" | python3 -c "
+message=$(echo "$input" | $PYTHON_BIN -c "
 import sys, json
 try:
     d = json.load(sys.stdin)

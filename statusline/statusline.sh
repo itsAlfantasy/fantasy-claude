@@ -2,6 +2,7 @@
 # Main statusline script — reads config.json and composes the status line
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO_DIR/lib/python.sh"
 CONFIG="$REPO_DIR/config.json"
 ELEMENTS_DIR="$REPO_DIR/statusline/elements"
 
@@ -102,7 +103,7 @@ while IFS= read -r raw_line; do
             current_parts+=("$formatted")
         fi
     fi
-done < <(python3 -c "
+done < <($PYTHON_BIN -c "
 import json, sys
 EMOJIS = {
     'battery': '\U0001f50b',

@@ -2,12 +2,13 @@
 # Hook script for sound events — reads config.json and plays the configured sound
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO_DIR/lib/python.sh"
 CONFIG="$REPO_DIR/config.json"
 
 input=$(cat)
 
 # Determine event type and whether it's an error
-hook_event=$(echo "$input" | python3 -c "
+hook_event=$(echo "$input" | $PYTHON_BIN -c "
 import sys, json
 try:
     d = json.load(sys.stdin)
@@ -25,7 +26,7 @@ except:
 
 [ -z "$hook_event" ] && exit 0
 
-sound_name=$(python3 -c "
+sound_name=$($PYTHON_BIN -c "
 import json
 with open('$CONFIG') as f:
     d = json.load(f)

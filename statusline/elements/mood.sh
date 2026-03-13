@@ -1,6 +1,7 @@
 #!/bin/bash
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-python3 - "$REPO_DIR/config.json" << 'PYEOF'
+source "$REPO_DIR/lib/python.sh"
+$PYTHON_BIN - "$REPO_DIR/config.json" << 'PYEOF'
 import json, sys
 from datetime import datetime
 

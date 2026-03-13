@@ -1,7 +1,8 @@
 #!/bin/bash
 # Estimated session cost from token counts in the active JSONL
 # Uses Sonnet 4.6 pricing: $3/MTok in, $15/MTok out, $3.75/MTok cache-write, $0.30/MTok cache-read
-python3 - << 'PYEOF'
+source "$(dirname "${BASH_SOURCE[0]}")/../../lib/python.sh"
+$PYTHON_BIN - << 'PYEOF'
 import glob, json, os, sys
 
 CLAUDE_DIR = os.path.expanduser("~/.claude/projects")

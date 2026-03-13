@@ -1,9 +1,10 @@
 #!/bin/bash
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$REPO_DIR/lib/python.sh"
 POMO_FILE="/tmp/pomodoro_$(id -u)"
 
 _get_duration() {
-    python3 - "$REPO_DIR/config.json" << 'PYEOF'
+    $PYTHON_BIN - "$REPO_DIR/config.json" << 'PYEOF'
 import json, sys
 try:
     with open(sys.argv[1]) as f:
