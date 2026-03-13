@@ -6,7 +6,7 @@ if [ -d "$INSTALL_DIR/.git" ]; then
     git -C "$INSTALL_DIR" pull origin main
 else
     echo "Installing claude-hooks..."
-    git clone https://github.com/itsAlfantasy/fantasty-claude.git "$INSTALL_DIR"
+    git clone https://github.com/itsAlfantasy/fantasy-claude.git "$INSTALL_DIR"
 fi
 cd "$INSTALL_DIR"
 bash install.sh

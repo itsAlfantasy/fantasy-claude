@@ -73,7 +73,7 @@ if [ -d "$INSTALL_DIR/.git" ]; then
     git -C "$INSTALL_DIR" pull origin main
 else
     echo "Installing claude-hooks..."
-    git clone https://github.com/itsAlfantasy/fantasty-claude.git "$INSTALL_DIR"
+    git clone https://github.com/itsAlfantasy/fantasy-claude.git "$INSTALL_DIR"
 fi
 
 cd "$INSTALL_DIR"
@@ -83,7 +83,7 @@ echo "Done! Restart Claude Code to apply changes."
 
 **L'utente installa con:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/itsAlfantasy/fantasty-claude/main/install-remote.sh | bash
+curl -fsSL https://raw.githubusercontent.com/itsAlfantasy/fantasy-claude/main/install-remote.sh | bash
 ```
 
 Pro: zero infrastruttura, funziona subito, supporta anche update.
@@ -120,7 +120,7 @@ Claude Code e un'app Node.js, quindi gli utenti hanno gia `npm`. E il canale piu
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/itsAlfantasy/fantasty-claude"
+    "url": "https://github.com/itsAlfantasy/fantasy-claude"
   }
 }
 ```
