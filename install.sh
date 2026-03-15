@@ -36,6 +36,7 @@ echo "$PYTHON_PATH" > "$REPO_DIR/.python_bin"
 chmod +x "$REPO_DIR/statusline/statusline.sh"
 chmod +x "$REPO_DIR/statusline/elements/"*.sh
 chmod +x "$REPO_DIR/hooks/sounds.sh"
+chmod +x "$REPO_DIR/hooks/burn-rate-update.sh"
 chmod +x "$REPO_DIR/hooks/notify-permission.sh"
 chmod +x "$REPO_DIR/hooks/notify-idle.sh"
 chmod +x "$REPO_DIR/hooks/notify-elicitation.sh"
@@ -77,6 +78,20 @@ for event in ["PostToolUse", "Stop", "Notification"]:
         event_hooks.append({
             "matcher": ".*" if event == "PostToolUse" else "",
             "hooks": [{"type": "command", "command": hook_command}]
+        })
+
+burn_rate_command = f"bash {repo_dir}/hooks/burn-rate-update.sh"
+
+for event in ["PostToolUse", "Stop"]:
+    event_hooks = hooks.setdefault(event, [])
+    already = any(
+        any(h.get("command") == burn_rate_command for h in entry.get("hooks", []))
+        for entry in event_hooks
+    )
+    if not already:
+        event_hooks.append({
+            "matcher": ".*" if event == "PostToolUse" else "",
+            "hooks": [{"type": "command", "command": burn_rate_command}]
         })
 
 with open(settings_path, "w") as f:
