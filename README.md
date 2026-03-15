@@ -18,15 +18,19 @@ Statusline and sound hooks for [Claude Code](https://claude.ai/code).
 
 Install via npm, then restart Claude Code:
 
-```bash
+```
 npx fantasy-claude install
 ```
 
-Alternatively, clone the repo and run `bash install.sh`.
-
 ## Configure
 
-Run `bash configure.sh` to open the TUI configurator. Navigate with arrow keys, confirm with Enter, go back with ←, quit with q.
+Open the TUI configurator with:
+
+```
+npx fantasy-claude
+```
+
+Navigate with arrow keys, confirm with Enter, go back with ←, quit with q.
 
 ---
 
