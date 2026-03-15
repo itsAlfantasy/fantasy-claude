@@ -1,10 +1,17 @@
 #!/bin/bash
-# Estimated session cost from token counts in the active JSONL
-# Uses Sonnet 4.6 pricing: $3/MTok in, $15/MTok out, $3.75/MTok cache-write, $0.30/MTok cache-read
+# Estimated session cost — prefers CLAUDE_COST_USD env var set by statusline.sh from stdin JSON
+# Fallback uses token counts from JSONL with Sonnet 4.6 pricing: $3/MTok in, $15/MTok out, $3.75/MTok cache-write, $0.30/MTok cache-read
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/python.sh"
 $PYTHON_BIN - << 'PYEOF'
 import glob, json, os, sys
 
+cost_env = os.environ.get('CLAUDE_COST_USD', '').strip()
+if cost_env != '':
+    cost = float(cost_env)
+    print(f"~${cost:.4f}" if cost < 0.01 else f"~${cost:.2f}")
+    sys.exit()
+
+# Fallback: parse JSONL (for dev/testing outside Claude Code)
 CLAUDE_DIR = os.path.expanduser("~/.claude/projects")
 files = glob.glob(f"{CLAUDE_DIR}/**/*.jsonl", recursive=True)
 if not files:
@@ -13,7 +20,6 @@ if not files:
 
 latest = max(files, key=os.path.getmtime)
 
-# Pricing per token (in USD)
 PRICE = {
     "input":        3.00 / 1_000_000,
     "output":      15.00 / 1_000_000,

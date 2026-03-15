@@ -6,6 +6,31 @@ source "$REPO_DIR/lib/python.sh"
 CONFIG="$REPO_DIR/config.json"
 ELEMENTS_DIR="$REPO_DIR/statusline/elements"
 
+# Read stdin JSON from Claude Code statusline API and export env vars for element scripts
+_STDIN=$(cat)
+export CLAUDE_MODEL=$(echo "$_STDIN" | $PYTHON_BIN -c "
+import sys,json
+d=json.load(sys.stdin)
+print(d.get('model',{}).get('display_name',''))
+" 2>/dev/null)
+export CLAUDE_CONTEXT_PCT=$(echo "$_STDIN" | $PYTHON_BIN -c "
+import sys,json
+d=json.load(sys.stdin)
+pct=d.get('context_window',{}).get('used_percentage')
+print('' if pct is None else str(round(pct)))
+" 2>/dev/null)
+export CLAUDE_COST_USD=$(echo "$_STDIN" | $PYTHON_BIN -c "
+import sys,json
+d=json.load(sys.stdin)
+cost=d.get('cost',{}).get('total_cost_usd')
+print('' if cost is None else str(cost))
+" 2>/dev/null)
+export CLAUDE_CONTEXT_SIZE=$(echo "$_STDIN" | $PYTHON_BIN -c "
+import sys,json
+d=json.load(sys.stdin)
+print(d.get('context_window',{}).get('context_window_size',''))
+" 2>/dev/null)
+
 BAR_WIDTH=8
 
 make_bar() {
@@ -158,24 +183,25 @@ MODEL_EMOJI_SETS = {
 }
 def get_model_emoji(set_idx=1):
     import glob, os
-    claude_dir = os.path.expanduser('~/.claude/projects')
-    files = glob.glob(f'{claude_dir}/**/*.jsonl', recursive=True)
-    if not files:
-        return ''
-    latest = max(files, key=os.path.getmtime)
-    model = None
-    try:
-        with open(latest, errors='replace') as fj:
-            for line in fj:
-                try:
-                    d = json.loads(line)
-                    if d.get('type') == 'assistant':
-                        m = d.get('message', {}).get('model')
-                        if m: model = m
-                except Exception:
-                    pass
-    except Exception:
-        pass
+    model = os.environ.get('CLAUDE_MODEL', '').strip()
+    if not model:
+        claude_dir = os.path.expanduser('~/.claude/projects')
+        files = glob.glob(f'{claude_dir}/**/*.jsonl', recursive=True)
+        if not files:
+            return ''
+        latest = max(files, key=os.path.getmtime)
+        try:
+            with open(latest, errors='replace') as fj:
+                for line in fj:
+                    try:
+                        d = json.loads(line)
+                        if d.get('type') == 'assistant':
+                            m = d.get('message', {}).get('model')
+                            if m: model = m
+                    except Exception:
+                        pass
+        except Exception:
+            pass
     if model:
         ml = model.lower()
         emoji_map = MODEL_EMOJI_SETS.get(set_idx, MODEL_EMOJI_SETS[1])

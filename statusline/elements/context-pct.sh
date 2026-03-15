@@ -1,16 +1,23 @@
 #!/bin/bash
-# Context window usage % from the most recent Claude Code session JSONL
+# Context window usage % — prefers CLAUDE_CONTEXT_PCT env var set by statusline.sh from stdin JSON
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/python.sh"
 $PYTHON_BIN - << 'PYEOF'
 import glob, json, os, sys
 
-CLAUDE_DIR = os.path.expanduser("~/.claude/projects")
-CONTEXT_WINDOW = 200_000  # all current Claude models
+pct_env = os.environ.get('CLAUDE_CONTEXT_PCT', '').strip()
+if pct_env != '':
+    print(f"{pct_env}%")
+    sys.exit()
 
-# Find the most recently modified JSONL
+# Fallback: parse JSONL (for dev/testing outside Claude Code)
+CLAUDE_DIR = os.path.expanduser("~/.claude/projects")
+
+size_env = os.environ.get('CLAUDE_CONTEXT_SIZE', '').strip()
+CONTEXT_WINDOW = int(size_env) if size_env else 200_000
+
 files = glob.glob(f"{CLAUDE_DIR}/**/*.jsonl", recursive=True)
 if not files:
-    print("--%")
+    print("0%")
     sys.exit()
 
 latest = max(files, key=os.path.getmtime)
@@ -28,7 +35,7 @@ with open(latest, errors="replace") as f:
             pass
 
 if not last_usage:
-    print("--%")
+    print("0%")
     sys.exit()
 
 total = (
