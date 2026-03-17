@@ -70,6 +70,10 @@ OB_IDX_DAILY_FOLDER = 4
 OB_IDX_INSTALL_MCP  = 5
 OB_IDX_INSTRUCTIONS = 6
 
+IT_IDX_FALLBACK     = 1
+IT_IDX_INSTALL      = 2
+IT_IDX_UNINSTALL    = 3
+
 ELEMENT_EMOJIS = {
     "battery": "\U0001f50b",
     "cwd": "\U0001f4c1",
@@ -378,6 +382,7 @@ def load_integrations() -> dict:
     ob = data["obsidian"]
     for key, _label, _required in OBSIDIAN_FIELDS:
         ob.setdefault(key, "")
+    data.setdefault("iterm2", {"fallback_profile": ""})
     return data
 
 
@@ -708,6 +713,104 @@ def draw_obsidian_config(
     actions = [
         (OB_IDX_INSTALL_MCP,  "[Install MCP provider]"),
         (OB_IDX_INSTRUCTIONS, "[View setup instructions]"),
+    ]
+    for act_idx, act_label in actions:
+        is_cursor = cursor == act_idx
+        try:
+            if is_cursor:
+                stdscr.addstr(row, 2, f"> {act_label}"[:w - 2], curses.A_REVERSE)
+            else:
+                stdscr.addstr(row, 2, f"  {act_label}"[:w - 2])
+        except curses.error:
+            pass
+        row += 1
+
+    footer_row = h - 2
+    if status_msg:
+        try:
+            stdscr.addstr(footer_row - 1, 2, status_msg[:w - 2], curses.A_BOLD)
+        except curses.error:
+            pass
+    elif footer_row - 1 > row + 1:
+        try:
+            stdscr.addstr(footer_row - 1, 2, "─" * min(w - 4, 56))
+        except curses.error:
+            pass
+    try:
+        stdscr.addstr(footer_row, 2, "↑↓ navigate   Enter edit/action   ESC back"[:w - 2], curses.A_DIM)
+    except curses.error:
+        pass
+    stdscr.refresh()
+
+
+def draw_iterm2_config(
+    stdscr,
+    iterm2_installed: bool,
+    profile_exists: bool,
+    wrapper_installed: bool,
+    integ: dict,
+    cursor: int,
+    edit_field: str | None,
+    edit_buf: str,
+    status_msg: str,
+) -> None:
+    stdscr.erase()
+    h, w = stdscr.getmaxyx()
+    try:
+        stdscr.addstr(0, 0, "  claude-hooks · Integrations › iTerm2  "[:w], curses.A_BOLD)
+        stdscr.addstr(1, 0, "─" * min(w, 60))
+    except curses.error:
+        pass
+
+    row = 3
+    label_col = 22
+    checks = [
+        ("iTerm2:", iterm2_installed),
+        ("Claude profile:", profile_exists),
+        ("zshrc wrapper:", wrapper_installed),
+    ]
+    for label, ok in checks:
+        status = "✓ installed" if ok else "✗ not found"
+        pair = CURSES_COLOR_MAP.get("green" if ok else "red", 0)
+        try:
+            stdscr.addstr(row, 2, f"{label:<20}"[:w - 2])
+            if pair and label_col < w:
+                stdscr.addstr(row, label_col, status[:w - label_col], curses.color_pair(pair))
+            elif label_col < w:
+                stdscr.addstr(row, label_col, status[:w - label_col])
+        except curses.error:
+            pass
+        row += 1
+
+    row += 1
+    # Fallback profile field
+    val = integ.get("iterm2", {}).get("fallback_profile", "")
+    is_cursor = cursor == IT_IDX_FALLBACK
+    if edit_field == "fallback_profile":
+        display = edit_buf + "_"
+        val_attr = curses.A_REVERSE
+    elif val:
+        max_val_w = w - label_col - 2
+        display = val if len(val) <= max_val_w else "…" + val[-(max_val_w - 1):]
+        val_attr = curses.A_NORMAL
+    else:
+        display = "(auto-detect)"
+        val_attr = curses.A_DIM
+    try:
+        label = f"{'Fallback profile':<20}"
+        if is_cursor:
+            stdscr.addstr(row, 2, f"> {label}"[:w - 2], curses.A_BOLD)
+        else:
+            stdscr.addstr(row, 2, f"  {label}"[:w - 2])
+        if label_col < w:
+            stdscr.addstr(row, label_col, display[:w - label_col - 1], val_attr)
+    except curses.error:
+        pass
+    row += 2
+
+    actions = [
+        (IT_IDX_INSTALL,   "[Install]"),
+        (IT_IDX_UNINSTALL, "[Uninstall]"),
     ]
     for act_idx, act_label in actions:
         is_cursor = cursor == act_idx
@@ -1817,9 +1920,87 @@ def run(stdscr) -> None:
 
             continue
 
+        elif screen == "iterm2_config":
+            draw_iterm2_config(stdscr, it_iterm2_installed, it_profile_exists, it_wrapper_installed,
+                               it_integ, it_cursor, it_edit_field, it_edit_buf, it_status_msg)
+            key = stdscr.getch()
+
+            _bare_esc = False
+            if key == 27:
+                stdscr.nodelay(True)
+                k2 = stdscr.getch()
+                k3 = stdscr.getch()
+                stdscr.nodelay(False)
+                if k2 == ord("["):
+                    if k3 == ord("A"):
+                        key = curses.KEY_UP
+                    elif k3 == ord("B"):
+                        key = curses.KEY_DOWN
+                else:
+                    _bare_esc = True
+
+            if it_edit_field is not None:
+                if key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
+                    it_integ.setdefault("iterm2", {})["fallback_profile"] = it_edit_buf
+                    save_integrations(it_integ)
+                    it_status_msg = "Saved"
+                    it_edit_field = None
+                    it_edit_buf = ""
+                elif _bare_esc:
+                    it_integ.setdefault("iterm2", {})["fallback_profile"] = it_edit_orig
+                    it_edit_field = None
+                    it_edit_buf = ""
+                    it_status_msg = ""
+                elif key in (127, curses.KEY_BACKSPACE):
+                    it_edit_buf = it_edit_buf[:-1]
+                elif 32 <= key <= 126:
+                    it_edit_buf += chr(key)
+            else:
+                if _bare_esc or key == ord("q"):
+                    if stack:
+                        screen, cursor = stack.pop()
+                elif key in (curses.KEY_UP, ord("k")):
+                    it_cursor = max(IT_IDX_FALLBACK, it_cursor - 1)
+                    it_status_msg = ""
+                elif key in (curses.KEY_DOWN, ord("j")):
+                    it_cursor = min(IT_IDX_UNINSTALL, it_cursor + 1)
+                    it_status_msg = ""
+                elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
+                    if it_cursor == IT_IDX_FALLBACK:
+                        it_edit_field = "fallback_profile"
+                        it_edit_buf = it_integ.get("iterm2", {}).get("fallback_profile", "")
+                        it_edit_orig = it_edit_buf
+                        it_status_msg = ""
+                    elif it_cursor == IT_IDX_INSTALL:
+                        from integrations.iterm2 import full_install
+                        it_status_msg = "Installing…"
+                        draw_iterm2_config(stdscr, it_iterm2_installed, it_profile_exists, it_wrapper_installed,
+                                           it_integ, it_cursor, None, "", it_status_msg)
+                        fallback = it_integ.get("iterm2", {}).get("fallback_profile", "") or None
+                        ok, msg = full_install(fallback)
+                        it_status_msg = msg
+                        from integrations.iterm2 import claude_profile_exists, is_zshrc_wrapper_installed, get_default_profile_name
+                        it_profile_exists = claude_profile_exists()
+                        it_wrapper_installed = is_zshrc_wrapper_installed()
+                        if ok and not it_integ.get("iterm2", {}).get("fallback_profile"):
+                            it_integ.setdefault("iterm2", {})["fallback_profile"] = get_default_profile_name()
+                            save_integrations(it_integ)
+                    elif it_cursor == IT_IDX_UNINSTALL:
+                        from integrations.iterm2 import full_uninstall
+                        it_status_msg = "Uninstalling…"
+                        draw_iterm2_config(stdscr, it_iterm2_installed, it_profile_exists, it_wrapper_installed,
+                                           it_integ, it_cursor, None, "", it_status_msg)
+                        ok, msg = full_uninstall()
+                        it_status_msg = msg
+                        from integrations.iterm2 import claude_profile_exists, is_zshrc_wrapper_installed
+                        it_profile_exists = claude_profile_exists()
+                        it_wrapper_installed = is_zshrc_wrapper_installed()
+
+            continue
+
         elif screen == "integrations":
             title = "Integrations"
-            items = ["Obsidian"]
+            items = ["Obsidian", "iTerm2"]
             hint = "↑↓ navigate   Enter select   ESC back   q quit"
 
         else:
@@ -1868,16 +2049,38 @@ def run(stdscr) -> None:
                     sl_settings_color_cursor = 0
 
             elif screen == "integrations":
-                # Only one item: Obsidian
-                ob_integ = load_integrations()
-                ob_cli_installed = check_obsidian_cli()
-                ob_cursor = OB_IDX_VAULT_PATH
-                ob_edit_field = None
-                ob_edit_buf = ""
-                ob_status_msg = ""
-                stack.append((screen, cursor))
-                screen = "obsidian_config"
-                cursor = 0
+                if cursor == 0:
+                    # Obsidian
+                    ob_integ = load_integrations()
+                    ob_cli_installed = check_obsidian_cli()
+                    ob_cursor = OB_IDX_VAULT_PATH
+                    ob_edit_field = None
+                    ob_edit_buf = ""
+                    ob_status_msg = ""
+                    stack.append((screen, cursor))
+                    screen = "obsidian_config"
+                    cursor = 0
+                elif cursor == 1:
+                    # iTerm2
+                    from integrations.iterm2 import (
+                        check_iterm2_installed, claude_profile_exists,
+                        is_zshrc_wrapper_installed, get_default_profile_name,
+                    )
+                    it_iterm2_installed = check_iterm2_installed()
+                    it_profile_exists = claude_profile_exists()
+                    it_wrapper_installed = is_zshrc_wrapper_installed()
+                    it_integ = load_integrations()
+                    if not it_integ.get("iterm2", {}).get("fallback_profile"):
+                        it_integ.setdefault("iterm2", {})["fallback_profile"] = get_default_profile_name()
+                        save_integrations(it_integ)
+                    it_cursor = IT_IDX_FALLBACK
+                    it_edit_field = None
+                    it_edit_buf = ""
+                    it_edit_orig = ""
+                    it_status_msg = ""
+                    stack.append((screen, cursor))
+                    screen = "iterm2_config"
+                    cursor = 0
 
             elif screen == "hooks":
                 if cursor < len(HOOKS_ITEMS):
