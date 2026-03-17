@@ -580,7 +580,7 @@ def draw_notify_config(stdscr, states: dict[str, bool], cursor: int) -> None:
     footer_row = h - 2
     if footer_row > row + 1:
         stdscr.addstr(footer_row - 1, 2, "─" * min(w - 4, 56))
-    hint = "↑↓ navigate   Enter toggle   ← back   q quit"
+    hint = "↑↓ navigate   Enter toggle   Esc back"
     if footer_row < h:
         stdscr.addstr(footer_row, 2, hint[:w - 2], curses.A_DIM)
 
@@ -619,7 +619,7 @@ def draw_git_cleanup_config(stdscr, enabled: bool) -> None:
     footer_row = h - 2
     if footer_row > row + 1:
         stdscr.addstr(footer_row - 1, 2, "─" * min(w - 4, 56))
-    hint = "Enter toggle   ← back   q quit"
+    hint = "Enter toggle   Esc back"
     if footer_row < h:
         stdscr.addstr(footer_row, 2, hint[:w - 2], curses.A_DIM)
 
@@ -651,7 +651,7 @@ def draw_obsidian_instructions(stdscr, scroll: int) -> None:
         except curses.error:
             pass
     try:
-        stdscr.addstr(h - 2, 2, "↑↓ scroll   ESC / q back"[:w - 2], curses.A_DIM)
+        stdscr.addstr(h - 2, 2, "↑↓ scroll   Esc back"[:w - 2], curses.A_DIM)
     except curses.error:
         pass
     stdscr.refresh()
@@ -936,7 +936,7 @@ def draw_statusline_editor(
             stdscr.addstr(footer_row - 1, 2, status_msg[:w - 2], curses.A_BOLD)
         except curses.error:
             pass
-    hint = "1-9/Tab/←/→ line   ↑↓ navigate   Enter toggle   c config   s save   q cancel"
+    hint = "1-9/Tab/←/→ line   ↑↓ navigate   Enter toggle   c config   s save   Esc back"
     if footer_row < h:
         try:
             stdscr.addstr(footer_row, 2, hint[:w - 2], curses.A_DIM)
@@ -1156,7 +1156,7 @@ def draw_element_config(
     footer_row = h - 2
     if footer_row > row + 1:
         stdscr.addstr(footer_row - 1, 2, "─" * min(w - 4, 56))
-    hint = "↑↓ navigate   Enter toggle/select   q back"
+    hint = "↑↓ navigate   Enter toggle/select   Esc back"
     if footer_row < h:
         stdscr.addstr(footer_row, 2, hint[:w - 2], curses.A_DIM)
 
@@ -1254,7 +1254,7 @@ def draw_statusline_settings(
             stdscr.addstr(footer_row - 1, 2, "─" * min(w - 4, 56))
         except curses.error:
             pass
-    hint = "←→ switch section   ↑↓ navigate   Enter select   ESC back   q quit"
+    hint = "←→ switch section   ↑↓ navigate   Enter select   Esc back"
     if footer_row < h:
         try:
             stdscr.addstr(footer_row, 2, hint[:w - 2], curses.A_DIM)
@@ -1342,7 +1342,7 @@ def run(stdscr) -> None:
             nf_count = sum(nf_states.values())
             notify_status = f"{nf_count}/{len(nf_states)}" if nf_count else "disabled"
             items.append(f"{'Notifications':<22} [{notify_status}]")
-            hint = "↑↓ navigate   Enter select   ← back   q quit"
+            hint = "↑↓ navigate   Enter select   Esc back"
 
         elif screen.startswith("sound_picker:"):
             event = screen.split(":", 1)[1]
@@ -1350,7 +1350,7 @@ def run(stdscr) -> None:
             sounds = list_sounds(EVENT_DIRS[event])
             current = cfg["sounds"].get(event) or "(none)"
             items = [f"{s} ✓" if s == current else s for s in sounds]
-            hint = "↑↓ navigate + preview   Enter confirm   ← back   q quit"
+            hint = "↑↓ navigate + preview   Enter confirm   Esc back"
 
         elif screen == "statusline_editor":
             draw_statusline_editor(
@@ -1379,30 +1379,35 @@ def run(stdscr) -> None:
                         key = curses.KEY_LEFT
                     elif k3 == ord("Z"):
                         key = curses.KEY_BTAB
+                else:
+                    # bare ESC → go back
+                    if stack:
+                        screen, cursor = stack.pop()
+                    continue
                 # else: stray ESC, ignore
 
 
-            if key in (curses.KEY_UP, ord("k")):
+            if key == curses.KEY_UP:
                 sl_elem_cursor = max(0, sl_elem_cursor - 1)
                 sl_status_msg = ""
                 _h, _ = stdscr.getmaxyx()
                 _avail = _h - (6 + len(sl_lines)) - 5
                 sl_elem_scroll = _clamp_elem_scroll(sl_elem_scroll, sl_elem_cursor, sl_elements, max(1, _avail))
 
-            elif key in (curses.KEY_DOWN, ord("j")):
+            elif key == curses.KEY_DOWN:
                 sl_elem_cursor = min(len(sl_elements) - 1, sl_elem_cursor + 1)
                 sl_status_msg = ""
                 _h, _ = stdscr.getmaxyx()
                 _avail = _h - (6 + len(sl_lines)) - 5
                 sl_elem_scroll = _clamp_elem_scroll(sl_elem_scroll, sl_elem_cursor, sl_elements, max(1, _avail))
 
-            elif key in (curses.KEY_LEFT, ord("h"), curses.KEY_BTAB):
+            elif key in (curses.KEY_LEFT, curses.KEY_BTAB):
                 sl_current_line = max(0, sl_current_line - 1)
                 sl_elem_cursor = 0
                 sl_elem_scroll = 0
                 sl_status_msg = ""
 
-            elif key in (curses.KEY_RIGHT, ord("l"), ord("\t")):  # Tab = next line
+            elif key in (curses.KEY_RIGHT, ord("\t")):  # Tab = next line
                 sl_current_line = min(len(sl_lines) - 1, sl_current_line + 1)
                 sl_elem_cursor = 0
                 sl_elem_scroll = 0
@@ -1461,10 +1466,6 @@ def run(stdscr) -> None:
                 stack.append((screen, cursor))
                 screen = "statusline_save_confirm"
 
-            elif key == ord("q"):
-                if stack:
-                    screen, cursor = stack.pop()
-
             continue
 
         elif screen == "statusline_save_confirm":
@@ -1481,7 +1482,7 @@ def run(stdscr) -> None:
                 stack.clear()
                 screen = "main"
                 cursor = 0
-            elif key in (ord("n"), ord("N"), curses.KEY_BACKSPACE, 127, curses.KEY_DC, 27, ord("q")):
+            elif key in (ord("n"), ord("N"), curses.KEY_BACKSPACE, 127, curses.KEY_DC, 27):
                 if stack:
                     screen, cursor = stack.pop()
             continue
@@ -1516,9 +1517,9 @@ def run(stdscr) -> None:
                 max_idx = extra_start + len(POMO_DURATIONS) - 1
             elif ec_elem in ("streak", "moon-phase", "cwd"):
                 max_idx = extra_start
-            if key in (curses.KEY_UP, ord("k")):
+            if key == curses.KEY_UP:
                 ec_cursor = max(0, ec_cursor - 1)
-            elif key in (curses.KEY_DOWN, ord("j")):
+            elif key == curses.KEY_DOWN:
                 ec_cursor = min(max_idx, ec_cursor + 1)
             elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
                 _extra = 2 + len(COLOR_OPTIONS)
@@ -1563,7 +1564,7 @@ def run(stdscr) -> None:
                 sl_settings[ec_elem] = entry
                 save_config(cfg)
                 clear_element_cache()
-            elif key in (ord("q"), curses.KEY_LEFT, ord("h"), 27):
+            elif key in (curses.KEY_LEFT, 27):
                 if stack:
                     screen, cursor = stack.pop()
 
@@ -1602,7 +1603,7 @@ def run(stdscr) -> None:
                 else:
                     _bare_esc = True
 
-            if _bare_esc or key == ord("q"):
+            if _bare_esc:
                 if stack:
                     screen, cursor = stack.pop()
                 sl_settings_section = 0
@@ -1611,12 +1612,12 @@ def run(stdscr) -> None:
                 sl_settings_section = (sl_settings_section - 1) % 2
             elif key in (curses.KEY_RIGHT,):
                 sl_settings_section = (sl_settings_section + 1) % 2
-            elif key in (curses.KEY_UP, ord("k")):
+            elif key == curses.KEY_UP:
                 if sl_settings_section == 0:
                     cursor = max(0, cursor - 1)
                 else:
                     sl_settings_color_cursor = max(0, sl_settings_color_cursor - 1)
-            elif key in (curses.KEY_DOWN, ord("j")):
+            elif key == curses.KEY_DOWN:
                 if sl_settings_section == 0:
                     cursor = min(6, cursor + 1)
                 else:
@@ -1709,13 +1710,13 @@ def run(stdscr) -> None:
                     ob_edit_buf += chr(key)
             else:
                 # Navigation mode
-                if _bare_esc or key == ord("q"):
+                if _bare_esc:
                     if stack:
                         screen, cursor = stack.pop()
-                elif key in (curses.KEY_UP, ord("k")):
+                elif key == curses.KEY_UP:
                     ob_cursor = max(OB_IDX_VAULT_PATH, ob_cursor - 1)
                     ob_status_msg = ""
-                elif key in (curses.KEY_DOWN, ord("j")):
+                elif key == curses.KEY_DOWN:
                     ob_cursor = min(OB_IDX_INSTRUCTIONS, ob_cursor + 1)
                     ob_status_msg = ""
                 elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
@@ -1757,11 +1758,11 @@ def run(stdscr) -> None:
                     _bare_esc = True
 
             max_scroll = max(0, len(OBSIDIAN_INSTRUCTIONS) - (stdscr.getmaxyx()[0] - 5))
-            if key in (curses.KEY_UP, ord("k")):
+            if key == curses.KEY_UP:
                 ob_instr_scroll = max(0, ob_instr_scroll - 1)
-            elif key in (curses.KEY_DOWN, ord("j")):
+            elif key == curses.KEY_DOWN:
                 ob_instr_scroll = min(max_scroll, ob_instr_scroll + 1)
-            elif _bare_esc or key == ord("q"):
+            elif _bare_esc:
                 if stack:
                     screen, cursor = stack.pop()
 
@@ -1786,7 +1787,7 @@ def run(stdscr) -> None:
 
             if key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
                 toggle_git_cleanup(not gc_enabled)
-            elif _bare_esc or key in (ord("q"), curses.KEY_LEFT):
+            elif _bare_esc or key == curses.KEY_LEFT:
                 if stack:
                     screen, cursor = stack.pop()
 
@@ -1822,7 +1823,7 @@ def run(stdscr) -> None:
             elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
                 ntype = ntypes[cursor]
                 toggle_notify_type(ntype, not nf_states[ntype])
-            elif _bare_esc or key in (ord("q"), curses.KEY_LEFT):
+            elif _bare_esc or key == curses.KEY_LEFT:
                 if stack:
                     screen, cursor = stack.pop()
 
@@ -1831,34 +1832,42 @@ def run(stdscr) -> None:
         elif screen == "integrations":
             title = "Integrations"
             items = ["Obsidian"]
-            hint = "↑↓ navigate   Enter select   ESC back   q quit"
+            hint = "↑↓ navigate   Enter select   Esc back"
 
         else:
             title = screen.capitalize()
             items = ["(coming soon)"]
-            hint = "← back   q quit"
+            hint = "Esc back"
 
         draw_screen(stdscr, title, items, cursor, hint)
 
         key = stdscr.getch()
 
         # Navigation
-        if key in (curses.KEY_UP, ord("k")):
+        if key == curses.KEY_UP:
             cursor = max(0, cursor - 1)
             if screen.startswith("sound_picker:"):
                 _play_preview(screen.split(":", 1)[1], sounds, cursor)
 
-        elif key in (curses.KEY_DOWN, ord("j")):
+        elif key == curses.KEY_DOWN:
             cursor = min(len(items) - 1, cursor + 1)
             if screen.startswith("sound_picker:"):
                 _play_preview(screen.split(":", 1)[1], sounds, cursor)
 
-        elif key in (curses.KEY_LEFT, ord("h"), 27):  # 27 = Esc
+        elif key in (curses.KEY_LEFT, 27):  # 27 = Esc
             if stack:
                 screen, cursor = stack.pop()
 
-        elif key == ord("q"):
-            break
+        elif key == ord("q") and screen == "main":
+            h, w = stdscr.getmaxyx()
+            msg = "quit? (y/n)"
+            try:
+                stdscr.addstr(h - 2, 2, msg + " " * (w - 2 - len(msg)), curses.A_DIM | curses.A_BOLD)
+            except curses.error:
+                pass
+            stdscr.refresh()
+            if stdscr.getch() in (ord("y"), ord("Y")):
+                break
 
         elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
             if screen == "main":
