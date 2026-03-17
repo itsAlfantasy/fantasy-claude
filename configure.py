@@ -165,11 +165,16 @@ def _bar_color_for(rule: str, pct: int) -> str:
 
 COLOR_OPTIONS = [
     ("none", None),
+    ("red", "31"),
+    ("orange", "38;5;208"),
+    ("yellow", "33"),
     ("green", "32"),
     ("cyan", "36"),
-    ("red", "31"),
-    ("yellow", "33"),
-    ("orange", "38;5;208"),
+    ("blue", "34"),
+    ("magenta", "35"),
+    ("pink", "38;5;213"),
+    ("lavender", "38;5;141"),
+    ("white", "97"),
     ("light gray", "37"),
     ("dark gray", "90"),
 ]
@@ -181,11 +186,16 @@ CURSES_COLOR_MAP: dict[str, int] = {}
 def init_colors() -> None:
     """Initialize curses color pairs for element preview colors."""
     pairs = [
-        ("green", curses.COLOR_GREEN),
-        ("cyan", curses.COLOR_CYAN),
         ("red", curses.COLOR_RED),
-        ("yellow", curses.COLOR_YELLOW),
         ("orange", 208),  # 256-color
+        ("yellow", 226),  # 256-color pure yellow — immune to terminal themes
+        ("green", 46),  # 256-color pure green — immune to terminal themes
+        ("cyan", curses.COLOR_CYAN),
+        ("blue", curses.COLOR_BLUE),
+        ("magenta", curses.COLOR_MAGENTA),
+        ("pink", 213),  # 256-color
+        ("lavender", 141),  # 256-color
+        ("white", 15),
         ("light gray", 7),
         ("dark gray", 8),
     ]
@@ -1052,10 +1062,15 @@ def draw_element_config(
 
     for i, (cname, _) in enumerate(COLOR_OPTIONS):
         list_idx = i + 2
-        marker = "●" if cname == (color_name or "none") else "○"
+        is_selected = cname == (color_name or "none")
+        marker = "●" if is_selected else "○"
         label = f"{marker} {cname}"
+        pair_idx = CURSES_COLOR_MAP.get(cname, 0)
+        color_attr = curses.color_pair(pair_idx) if pair_idx else curses.A_NORMAL
         if list_idx == cursor:
             stdscr.addstr(row, 2, f"> {label}"[:w - 2], curses.A_REVERSE)
+        elif is_selected:
+            stdscr.addstr(row, 2, f"  {label}"[:w - 2], color_attr | curses.A_BOLD)
         else:
             stdscr.addstr(row, 2, f"  {label}"[:w - 2])
         row += 1
@@ -1233,12 +1248,18 @@ def draw_statusline_settings(
             if row >= h - 4:
                 break
             val_str = val or "none"
-            line_str = f"{label}  [ {val_str} ]"
+            pair_idx = CURSES_COLOR_MAP.get(val or "", 0)
+            color_attr = curses.color_pair(pair_idx) if pair_idx else curses.A_NORMAL
+            prefix_str = f"  {label}  [ "
+            suffix_str = " ]"
             try:
                 if i == color_cursor:
+                    line_str = f"{label}  [ {val_str} ]"
                     stdscr.addstr(row, 2, f"> {line_str}"[:w - 2], curses.A_REVERSE)
                 else:
-                    stdscr.addstr(row, 2, f"  {line_str}"[:w - 2])
+                    stdscr.addstr(row, 2, prefix_str)
+                    stdscr.addstr(val_str, color_attr | curses.A_BOLD)
+                    stdscr.addstr(suffix_str)
             except curses.error:
                 pass
             row += 1
