@@ -27,6 +27,8 @@ HOOKS_ITEMS = ["on_error", "on_stop", "on_notification"]
 MAIN_ITEMS = ["Hooks", "Statusline", "Integrations"]
 MAX_ELEMENTS_PER_LINE = 4
 
+_element_cache: dict[str, str] = {}  # name -> raw_output
+
 SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
 SESSION_HOOK_SCRIPT = Path.home() / ".claude" / "hooks" / "session-git-cleanup.sh"
 INTEGRATIONS_PATH = Path.home() / ".claude" / "integrations.json"
@@ -304,11 +306,15 @@ def list_elements() -> list[str]:
 def run_element(name: str, settings: dict | None = None) -> list[tuple[str, str | None]]:
     """Return a list of (text, color_name) segments for rendering."""
     script = REPO_DIR / "statusline/elements" / f"{name}.sh"
-    try:
-        r = subprocess.run(["bash", str(script)], capture_output=True, text=True, timeout=2)
-        raw = r.stdout.strip() or name
-    except Exception:
-        raw = name
+    if name in _element_cache:
+        raw = _element_cache[name]
+    else:
+        try:
+            r = subprocess.run(["bash", str(script)], capture_output=True, text=True, timeout=2)
+            raw = r.stdout.strip() or name
+        except Exception:
+            raw = name
+        _element_cache[name] = raw
     if settings:
         s = settings.get(name, {})
         prefix_parts = []
@@ -353,6 +359,10 @@ def run_element(name: str, settings: dict | None = None) -> list[tuple[str, str 
         text = f"{' '.join(prefix_parts)} {raw}" if prefix_parts else raw
         return [(text, None)]
     return [(raw, None)]
+
+
+def clear_element_cache() -> None:
+    _element_cache.clear()
 
 
 def load_config() -> dict:
@@ -1552,6 +1562,7 @@ def run(stdscr) -> None:
                     entry["basename_only"] = ec_cwd_basename
                 sl_settings[ec_elem] = entry
                 save_config(cfg)
+                clear_element_cache()
             elif key in (ord("q"), curses.KEY_LEFT, ord("h"), 27):
                 if stack:
                     screen, cursor = stack.pop()
