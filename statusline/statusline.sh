@@ -169,8 +169,10 @@ LABELS = {
     'haiku': 'haiku',
 }
 COLORS = {
-    'green': '32', 'cyan': '36', 'red': '31', 'yellow': '33',
-    'orange': '38;5;208', 'light gray': '37', 'dark gray': '90',
+    'red': '31', 'orange': '38;5;208', 'yellow': '33',
+    'green': '32', 'cyan': '36', 'blue': '34',
+    'magenta': '35', 'pink': '38;5;213', 'lavender': '38;5;141', 'white': '97',
+    'light gray': '37', 'dark gray': '90',
 }
 BAR_ELEMENTS = {
     'context-pct': 'usage',

@@ -165,11 +165,16 @@ def _bar_color_for(rule: str, pct: int) -> str:
 
 COLOR_OPTIONS = [
     ("none", None),
+    ("red", "31"),
+    ("orange", "38;5;208"),
+    ("yellow", "33"),
     ("green", "32"),
     ("cyan", "36"),
-    ("red", "31"),
-    ("yellow", "33"),
-    ("orange", "38;5;208"),
+    ("blue", "34"),
+    ("magenta", "35"),
+    ("pink", "38;5;213"),
+    ("lavender", "38;5;141"),
+    ("white", "97"),
     ("light gray", "37"),
     ("dark gray", "90"),
 ]
@@ -181,11 +186,16 @@ CURSES_COLOR_MAP: dict[str, int] = {}
 def init_colors() -> None:
     """Initialize curses color pairs for element preview colors."""
     pairs = [
-        ("green", curses.COLOR_GREEN),
-        ("cyan", curses.COLOR_CYAN),
         ("red", curses.COLOR_RED),
-        ("yellow", curses.COLOR_YELLOW),
         ("orange", 208),  # 256-color
+        ("yellow", 226),  # 256-color pure yellow — immune to terminal themes
+        ("green", 46),  # 256-color pure green — immune to terminal themes
+        ("cyan", curses.COLOR_CYAN),
+        ("blue", curses.COLOR_BLUE),
+        ("magenta", curses.COLOR_MAGENTA),
+        ("pink", 213),  # 256-color
+        ("lavender", 141),  # 256-color
+        ("white", 15),
         ("light gray", 7),
         ("dark gray", 8),
     ]
@@ -580,7 +590,7 @@ def draw_notify_config(stdscr, states: dict[str, bool], cursor: int) -> None:
     footer_row = h - 2
     if footer_row > row + 1:
         stdscr.addstr(footer_row - 1, 2, "─" * min(w - 4, 56))
-    hint = "↑↓ navigate   Enter toggle   ← back   q quit"
+    hint = "↑↓ navigate   Enter toggle   Esc back"
     if footer_row < h:
         stdscr.addstr(footer_row, 2, hint[:w - 2], curses.A_DIM)
 
@@ -619,7 +629,7 @@ def draw_git_cleanup_config(stdscr, enabled: bool) -> None:
     footer_row = h - 2
     if footer_row > row + 1:
         stdscr.addstr(footer_row - 1, 2, "─" * min(w - 4, 56))
-    hint = "Enter toggle   ← back   q quit"
+    hint = "Enter toggle   Esc back"
     if footer_row < h:
         stdscr.addstr(footer_row, 2, hint[:w - 2], curses.A_DIM)
 
@@ -651,7 +661,7 @@ def draw_obsidian_instructions(stdscr, scroll: int) -> None:
         except curses.error:
             pass
     try:
-        stdscr.addstr(h - 2, 2, "↑↓ scroll   ESC / q back"[:w - 2], curses.A_DIM)
+        stdscr.addstr(h - 2, 2, "↑↓ scroll   Esc back"[:w - 2], curses.A_DIM)
     except curses.error:
         pass
     stdscr.refresh()
@@ -936,7 +946,7 @@ def draw_statusline_editor(
             stdscr.addstr(footer_row - 1, 2, status_msg[:w - 2], curses.A_BOLD)
         except curses.error:
             pass
-    hint = "1-9/Tab/←/→ line   ↑↓ navigate   Enter toggle   c config   s save   q cancel"
+    hint = "1-9/Tab/←/→ line   ↑↓ navigate   Enter toggle   c config   s save   Esc back"
     if footer_row < h:
         try:
             stdscr.addstr(footer_row, 2, hint[:w - 2], curses.A_DIM)
@@ -1002,13 +1012,77 @@ def draw_save_confirm(
     stdscr.refresh()
 
 
+def _element_config_sections(element: str) -> list[str]:
+    sections = ["Emoji", "Label", "Color"]
+    if element in BAR_ELEMENTS:
+        sections.append("Bar")
+    elif element == "pomodoro":
+        sections.append("Duration")
+    elif element == "streak":
+        sections.append("Show unit")
+    elif element == "moon-phase":
+        sections.append("Show name")
+    elif element == "cwd":
+        sections.append("Basename")
+    return sections
+
+
+def _ec_section_max_option(element: str, section: int) -> int:
+    """Return the max option index for a given section."""
+    if section == 0:  # Emoji (+ set picker for model/mood)
+        if element == "model":
+            return len(MODEL_EMOJI_SETS) - 1  # toggle + 2 sets
+        if element == "mood":
+            return len(MOOD_EMOJI_SETS)  # toggle + 3 sets
+        return 0
+    if section == 1:  # Label — single toggle
+        return 0
+    if section == 2:  # Color
+        return len(COLOR_OPTIONS) - 1
+    # Section 3 — extra
+    if element in BAR_ELEMENTS:
+        return len(BAR_OPTIONS) - 1  # 2
+    if element == "pomodoro":
+        return len(POMO_DURATIONS) - 1  # 5
+    # streak, moon-phase, cwd — single checkbox
+    return 0
+
+
+def _ec_snap_option(element: str, section: int, **state) -> int:
+    """Return the option index that matches the current selection."""
+    if section == 0:
+        if element == "model":
+            return max(0, state.get("model_set", 1))  # 0=toggle, 1+=sets
+        if element == "mood":
+            return max(0, state.get("mood_set", 1))
+        return 0
+    if section == 1:
+        return 0
+    if section == 2:
+        color = state.get("color")
+        target = color or "none"
+        for i, (cname, _) in enumerate(COLOR_OPTIONS):
+            if cname == target:
+                return i
+        return 0
+    # section 3
+    if element in BAR_ELEMENTS:
+        bar = state.get("bar", "off")
+        return BAR_OPTIONS.index(bar) if bar in BAR_OPTIONS else 0
+    if element == "pomodoro":
+        dur = state.get("pomo_duration", 25)
+        return POMO_DURATIONS.index(dur) if dur in POMO_DURATIONS else 2
+    return 0
+
+
 def draw_element_config(
     stdscr,
     element: str,
     emoji_on: bool,
     label_on: bool,
     color_name: str | None,
-    cursor: int,
+    section: int,
+    option: int,
     bar: str = "off",
     emoji_set: int = 1,
     mood_set: int = 1,
@@ -1020,143 +1094,145 @@ def draw_element_config(
     stdscr.erase()
     h, w = stdscr.getmaxyx()
 
-    if element == "model":
-        cur_set = MODEL_EMOJI_SETS[emoji_set] if emoji_set in (1, 2) else MODEL_EMOJI_SETS[1]
-        emoji_char = " ".join(cur_set.values())
-    elif element == "mood":
-        emoji_char = " ".join(MOOD_EMOJI_SETS.get(1, []))
-    else:
-        emoji_char = ELEMENT_EMOJIS.get(element, "")
-    label_word = ELEMENT_LABELS.get(element, "")
     title = f"claude-hooks · Element: {element}"
     stdscr.addstr(0, 0, f"  {title}  "[:w], curses.A_BOLD)
     stdscr.addstr(1, 0, "─" * min(w, 60))
 
+    sections = _element_config_sections(element)
+
+    # Tab bar — row 3
     row = 3
-    emoji_text = f"{'[x]' if emoji_on else '[ ]'} Emoji: {emoji_char}" if emoji_char else "[ ] Emoji: (none available)"
-    if cursor == 0:
-        stdscr.addstr(row, 2, f"> {emoji_text}"[:w - 2], curses.A_REVERSE)
-    else:
-        stdscr.addstr(row, 2, f"  {emoji_text}"[:w - 2])
+    col = 2
+    for si, sname in enumerate(sections):
+        if si == section:
+            tab_text = f"  [ {sname} ]  "
+        else:
+            tab_text = f"  {sname}  "
+        try:
+            attr = curses.A_REVERSE if si == section else curses.A_NORMAL
+            stdscr.addstr(row, col, tab_text[:max(0, w - col)], attr)
+        except curses.error:
+            pass
+        col += len(tab_text)
     row += 1
+    try:
+        stdscr.addstr(row, 0, "─" * min(w, 60))
+    except curses.error:
+        pass
+    row += 2  # row 6
 
-    label_text = f"{'[x]' if label_on else '[ ]'} Label: {label_word}" if label_word else "[ ] Label: (none available)"
-    if cursor == 1:
-        stdscr.addstr(row, 2, f"> {label_text}"[:w - 2], curses.A_REVERSE)
-    else:
-        stdscr.addstr(row, 2, f"  {label_text}"[:w - 2])
-    row += 2
-
-    stdscr.addstr(row, 2, "Color:"[:w - 2], curses.A_BOLD)
-    row += 1
-
-    for i, (cname, _) in enumerate(COLOR_OPTIONS):
-        list_idx = i + 2
-        marker = "●" if cname == (color_name or "none") else "○"
-        label = f"{marker} {cname}"
-        if list_idx == cursor:
-            stdscr.addstr(row, 2, f"> {label}"[:w - 2], curses.A_REVERSE)
+    # Section content
+    if section == 0:  # Emoji (+ set picker for model/mood)
+        emoji_char = ELEMENT_EMOJIS.get(element, "")
+        marker = "[x]" if emoji_on else "[ ]"
+        text = f"{marker} Enable emoji: {emoji_char}" if emoji_char else f"{marker} Enable emoji: (none available)"
+        if option == 0:
+            stdscr.addstr(row, 2, f"> {text}"[:w - 2], curses.A_REVERSE)
         else:
-            stdscr.addstr(row, 2, f"  {label}"[:w - 2])
+            stdscr.addstr(row, 2, f"  {text}"[:w - 2])
         row += 1
 
-    extra_start = 2 + len(COLOR_OPTIONS)
+        if element == "model":
+            row += 1
+            stdscr.addstr(row, 2, "Emoji set:"[:w - 2], curses.A_BOLD)
+            row += 1
+            for i, set_map in enumerate(MODEL_EMOJI_SETS[1:], start=1):
+                if row >= h - 3:
+                    break
+                is_sel = emoji_set == i
+                mk = "●" if is_sel else "○"
+                icons = " ".join(set_map.values())
+                opt_label = f"{mk} set {i}  {icons}"
+                if option == i:
+                    stdscr.addstr(row, 2, f"> {opt_label}"[:w - 2], curses.A_REVERSE)
+                else:
+                    stdscr.addstr(row, 2, f"  {opt_label}"[:w - 2])
+                row += 1
 
-    if element == "model" and row < h - 5:
-        row += 1
-        stdscr.addstr(row, 2, "Emoji set:"[:w - 2], curses.A_BOLD)
-        row += 1
-        for i, set_map in enumerate(MODEL_EMOJI_SETS[1:], start=1):
-            list_idx = extra_start + (i - 1)
-            marker = "●" if emoji_set == i else "○"
-            icons = " ".join(set_map.values())
-            opt_label = f"{marker} set {i}  {icons}"
-            if list_idx == cursor:
-                stdscr.addstr(row, 2, f"> {opt_label}"[:w - 2], curses.A_REVERSE)
+        elif element == "mood":
+            row += 1
+            stdscr.addstr(row, 2, "Emoji set:"[:w - 2], curses.A_BOLD)
+            row += 1
+            for i, emojis in MOOD_EMOJI_SETS.items():
+                if row >= h - 3:
+                    break
+                is_sel = mood_set == i
+                mk = "●" if is_sel else "○"
+                preview = " ".join(emojis)
+                opt_label = f"{mk} set {i}  {preview}"
+                if option == i:
+                    stdscr.addstr(row, 2, f"> {opt_label}"[:w - 2], curses.A_REVERSE)
+                else:
+                    stdscr.addstr(row, 2, f"  {opt_label}"[:w - 2])
+                row += 1
+
+    elif section == 1:  # Label
+        label_word = ELEMENT_LABELS.get(element, "")
+        marker = "[x]" if label_on else "[ ]"
+        text = f"{marker} Enable label: {label_word}" if label_word else f"{marker} Enable label: (none available)"
+        stdscr.addstr(row, 2, f"> {text}"[:w - 2], curses.A_REVERSE)
+
+    elif section == 2:  # Color
+        for i, (cname, _) in enumerate(COLOR_OPTIONS):
+            if row >= h - 3:
+                break
+            is_selected = cname == (color_name or "none")
+            marker = "●" if is_selected else "○"
+            label = f"{marker} {cname}"
+            pair_idx = CURSES_COLOR_MAP.get(cname, 0)
+            color_attr = curses.color_pair(pair_idx) if pair_idx else curses.A_NORMAL
+            if i == option:
+                stdscr.addstr(row, 2, f"> {label}"[:w - 2], curses.A_REVERSE)
+            elif is_selected:
+                stdscr.addstr(row, 2, f"  {label}"[:w - 2], color_attr | curses.A_BOLD)
             else:
-                stdscr.addstr(row, 2, f"  {opt_label}"[:w - 2])
+                stdscr.addstr(row, 2, f"  {label}"[:w - 2])
             row += 1
 
-    if element in BAR_ELEMENTS and row < h - 6:
-        row += 1
-        stdscr.addstr(row, 2, "Bar:"[:w - 2], curses.A_BOLD)
-        row += 1
-        for i, opt in enumerate(BAR_OPTIONS):
-            list_idx = extra_start + i
-            marker = "●" if opt == (bar or "off") else "○"
-            opt_label = f"{marker} {opt}"
-            if list_idx == cursor:
-                stdscr.addstr(row, 2, f"> {opt_label}"[:w - 2], curses.A_REVERSE)
-            else:
-                stdscr.addstr(row, 2, f"  {opt_label}"[:w - 2])
-            row += 1
+    elif section == 3:  # Extra
+        if element in BAR_ELEMENTS:
+            for i, opt in enumerate(BAR_OPTIONS):
+                if row >= h - 3:
+                    break
+                marker = "●" if opt == (bar or "off") else "○"
+                opt_label = f"{marker} {opt}"
+                if i == option:
+                    stdscr.addstr(row, 2, f"> {opt_label}"[:w - 2], curses.A_REVERSE)
+                else:
+                    stdscr.addstr(row, 2, f"  {opt_label}"[:w - 2])
+                row += 1
 
-    if element == "mood" and row < h - 5:
-        row += 1
-        stdscr.addstr(row, 2, "Emoji set:"[:w - 2], curses.A_BOLD)
-        row += 1
-        for i, emojis in MOOD_EMOJI_SETS.items():
-            list_idx = extra_start + (i - 1)
-            marker = "●" if mood_set == i else "○"
-            preview = " ".join(emojis)
-            opt_label = f"{marker} set {i}  {preview}"
-            if list_idx == cursor:
-                stdscr.addstr(row, 2, f"> {opt_label}"[:w - 2], curses.A_REVERSE)
-            else:
-                stdscr.addstr(row, 2, f"  {opt_label}"[:w - 2])
-            row += 1
+        elif element == "pomodoro":
+            for i, mins in enumerate(POMO_DURATIONS):
+                if row >= h - 3:
+                    break
+                marker = "●" if pomo_duration == mins else "○"
+                opt_label = f"{marker} {mins} min"
+                if i == option:
+                    stdscr.addstr(row, 2, f"> {opt_label}"[:w - 2], curses.A_REVERSE)
+                else:
+                    stdscr.addstr(row, 2, f"  {opt_label}"[:w - 2])
+                row += 1
 
-    if element == "pomodoro" and row < h - 5:
-        row += 1
-        stdscr.addstr(row, 2, "Duration:"[:w - 2], curses.A_BOLD)
-        row += 1
-        for i, mins in enumerate(POMO_DURATIONS):
-            list_idx = extra_start + i
-            marker = "●" if pomo_duration == mins else "○"
-            opt_label = f"{marker} {mins} min"
-            if list_idx == cursor:
-                stdscr.addstr(row, 2, f"> {opt_label}"[:w - 2], curses.A_REVERSE)
-            else:
-                stdscr.addstr(row, 2, f"  {opt_label}"[:w - 2])
-            row += 1
+        elif element == "streak":
+            marker = "[x]" if streak_unit else "[ ]"
+            text = f"{marker} Show unit  (e.g. '5 days' vs '5d')"
+            stdscr.addstr(row, 2, f"> {text}"[:w - 2], curses.A_REVERSE)
 
-    if element == "streak" and row < h - 5:
-        row += 1
-        list_idx = extra_start
-        marker = "[x]" if streak_unit else "[ ]"
-        unit_label = f"{marker} Show unit  (e.g. '5 days' vs '5d')"
-        if list_idx == cursor:
-            stdscr.addstr(row, 2, f"> {unit_label}"[:w - 2], curses.A_REVERSE)
-        else:
-            stdscr.addstr(row, 2, f"  {unit_label}"[:w - 2])
-        row += 1
+        elif element == "moon-phase":
+            marker = "[x]" if moon_name else "[ ]"
+            text = f"{marker} Show phase name  (e.g. '🌗 Last Quarter')"
+            stdscr.addstr(row, 2, f"> {text}"[:w - 2], curses.A_REVERSE)
 
-    if element == "moon-phase" and row < h - 5:
-        row += 1
-        list_idx = extra_start
-        marker = "[x]" if moon_name else "[ ]"
-        name_label = f"{marker} Show phase name  (e.g. '🌗 Last Quarter')"
-        if list_idx == cursor:
-            stdscr.addstr(row, 2, f"> {name_label}"[:w - 2], curses.A_REVERSE)
-        else:
-            stdscr.addstr(row, 2, f"  {name_label}"[:w - 2])
-        row += 1
-
-    if element == "cwd" and row < h - 5:
-        row += 1
-        list_idx = extra_start
-        marker = "[x]" if cwd_basename else "[ ]"
-        bn_label = f"{marker} Basename only  (e.g. 'my-project' vs '~/Dev/my-project')"
-        if list_idx == cursor:
-            stdscr.addstr(row, 2, f"> {bn_label}"[:w - 2], curses.A_REVERSE)
-        else:
-            stdscr.addstr(row, 2, f"  {bn_label}"[:w - 2])
-        row += 1
+        elif element == "cwd":
+            marker = "[x]" if cwd_basename else "[ ]"
+            text = f"{marker} Basename only  (e.g. 'my-project' vs '~/Dev/my-project')"
+            stdscr.addstr(row, 2, f"> {text}"[:w - 2], curses.A_REVERSE)
 
     footer_row = h - 2
     if footer_row > row + 1:
         stdscr.addstr(footer_row - 1, 2, "─" * min(w - 4, 56))
-    hint = "↑↓ navigate   Enter toggle/select   q back"
+    hint = "←→ section   ↑↓ navigate   Enter toggle/select   Esc back"
     if footer_row < h:
         stdscr.addstr(footer_row, 2, hint[:w - 2], curses.A_DIM)
 
@@ -1233,12 +1309,18 @@ def draw_statusline_settings(
             if row >= h - 4:
                 break
             val_str = val or "none"
-            line_str = f"{label}  [ {val_str} ]"
+            pair_idx = CURSES_COLOR_MAP.get(val or "", 0)
+            color_attr = curses.color_pair(pair_idx) if pair_idx else curses.A_NORMAL
+            prefix_str = f"  {label}  [ "
+            suffix_str = " ]"
             try:
                 if i == color_cursor:
+                    line_str = f"{label}  [ {val_str} ]"
                     stdscr.addstr(row, 2, f"> {line_str}"[:w - 2], curses.A_REVERSE)
                 else:
-                    stdscr.addstr(row, 2, f"  {line_str}"[:w - 2])
+                    stdscr.addstr(row, 2, prefix_str)
+                    stdscr.addstr(val_str, color_attr | curses.A_BOLD)
+                    stdscr.addstr(suffix_str)
             except curses.error:
                 pass
             row += 1
@@ -1254,7 +1336,7 @@ def draw_statusline_settings(
             stdscr.addstr(footer_row - 1, 2, "─" * min(w - 4, 56))
         except curses.error:
             pass
-    hint = "←→ switch section   ↑↓ navigate   Enter select   ESC back   q quit"
+    hint = "←→ switch section   ↑↓ navigate   Enter select   Esc back"
     if footer_row < h:
         try:
             stdscr.addstr(footer_row, 2, hint[:w - 2], curses.A_DIM)
@@ -1306,7 +1388,8 @@ def run(stdscr) -> None:
     ec_streak_unit: bool = True
     ec_moon_name: bool = False
     ec_cwd_basename: bool = False
-    ec_cursor: int = 0
+    ec_section: int = 0
+    ec_option: int = 0
 
     # Statusline settings screen state
     sl_settings_section: int = 0      # 0 = Number of lines, 1 = General color
@@ -1342,7 +1425,7 @@ def run(stdscr) -> None:
             nf_count = sum(nf_states.values())
             notify_status = f"{nf_count}/{len(nf_states)}" if nf_count else "disabled"
             items.append(f"{'Notifications':<22} [{notify_status}]")
-            hint = "↑↓ navigate   Enter select   ← back   q quit"
+            hint = "↑↓ navigate   Enter select   Esc back"
 
         elif screen.startswith("sound_picker:"):
             event = screen.split(":", 1)[1]
@@ -1350,7 +1433,7 @@ def run(stdscr) -> None:
             sounds = list_sounds(EVENT_DIRS[event])
             current = cfg["sounds"].get(event) or "(none)"
             items = [f"{s} ✓" if s == current else s for s in sounds]
-            hint = "↑↓ navigate + preview   Enter confirm   ← back   q quit"
+            hint = "↑↓ navigate + preview   Enter confirm   Esc back"
 
         elif screen == "statusline_editor":
             draw_statusline_editor(
@@ -1379,30 +1462,35 @@ def run(stdscr) -> None:
                         key = curses.KEY_LEFT
                     elif k3 == ord("Z"):
                         key = curses.KEY_BTAB
+                else:
+                    # bare ESC → go back
+                    if stack:
+                        screen, cursor = stack.pop()
+                    continue
                 # else: stray ESC, ignore
 
 
-            if key in (curses.KEY_UP, ord("k")):
+            if key == curses.KEY_UP:
                 sl_elem_cursor = max(0, sl_elem_cursor - 1)
                 sl_status_msg = ""
                 _h, _ = stdscr.getmaxyx()
                 _avail = _h - (6 + len(sl_lines)) - 5
                 sl_elem_scroll = _clamp_elem_scroll(sl_elem_scroll, sl_elem_cursor, sl_elements, max(1, _avail))
 
-            elif key in (curses.KEY_DOWN, ord("j")):
+            elif key == curses.KEY_DOWN:
                 sl_elem_cursor = min(len(sl_elements) - 1, sl_elem_cursor + 1)
                 sl_status_msg = ""
                 _h, _ = stdscr.getmaxyx()
                 _avail = _h - (6 + len(sl_lines)) - 5
                 sl_elem_scroll = _clamp_elem_scroll(sl_elem_scroll, sl_elem_cursor, sl_elements, max(1, _avail))
 
-            elif key in (curses.KEY_LEFT, ord("h"), curses.KEY_BTAB):
+            elif key in (curses.KEY_LEFT, curses.KEY_BTAB):
                 sl_current_line = max(0, sl_current_line - 1)
                 sl_elem_cursor = 0
                 sl_elem_scroll = 0
                 sl_status_msg = ""
 
-            elif key in (curses.KEY_RIGHT, ord("l"), ord("\t")):  # Tab = next line
+            elif key in (curses.KEY_RIGHT, ord("\t")):  # Tab = next line
                 sl_current_line = min(len(sl_lines) - 1, sl_current_line + 1)
                 sl_elem_cursor = 0
                 sl_elem_scroll = 0
@@ -1452,7 +1540,8 @@ def run(stdscr) -> None:
                 ec_streak_unit = settings.get("show_unit", True)
                 ec_moon_name = settings.get("show_name", False)
                 ec_cwd_basename = settings.get("basename_only", False)
-                ec_cursor = 0
+                ec_section = 0
+                ec_option = 0
                 stack.append((screen, cursor))
                 screen = "element_config"
                 cursor = 0
@@ -1460,10 +1549,6 @@ def run(stdscr) -> None:
             elif key == ord("s"):
                 stack.append((screen, cursor))
                 screen = "statusline_save_confirm"
-
-            elif key == ord("q"):
-                if stack:
-                    screen, cursor = stack.pop()
 
             continue
 
@@ -1481,16 +1566,17 @@ def run(stdscr) -> None:
                 stack.clear()
                 screen = "main"
                 cursor = 0
-            elif key in (ord("n"), ord("N"), curses.KEY_BACKSPACE, 127, curses.KEY_DC, 27, ord("q")):
+            elif key in (ord("n"), ord("N"), curses.KEY_BACKSPACE, 127, curses.KEY_DC, 27):
                 if stack:
                     screen, cursor = stack.pop()
             continue
 
         elif screen == "element_config":
-            draw_element_config(stdscr, ec_elem, ec_emoji_on, ec_label_on, ec_color, ec_cursor, ec_bar, ec_model_set, ec_mood_set, ec_pomo_duration, ec_streak_unit, ec_moon_name, ec_cwd_basename)
+            draw_element_config(stdscr, ec_elem, ec_emoji_on, ec_label_on, ec_color, ec_section, ec_option, ec_bar, ec_model_set, ec_mood_set, ec_pomo_duration, ec_streak_unit, ec_moon_name, ec_cwd_basename)
             key = stdscr.getch()
 
             # ESC sequence handling
+            _bare_esc = False
             if key == 27:
                 stdscr.nodelay(True)
                 k2 = stdscr.getch()
@@ -1501,50 +1587,56 @@ def run(stdscr) -> None:
                         key = curses.KEY_UP
                     elif k3 == ord("B"):
                         key = curses.KEY_DOWN
+                    elif k3 == ord("C"):
+                        key = curses.KEY_RIGHT
                     elif k3 == ord("D"):
                         key = curses.KEY_LEFT
+                else:
+                    _bare_esc = True
 
-            extra_start = 2 + len(COLOR_OPTIONS)
-            max_idx = extra_start - 1
-            if ec_elem == "model":
-                max_idx = extra_start + len(MODEL_EMOJI_SETS) - 2
-            elif ec_elem in BAR_ELEMENTS:
-                max_idx = extra_start + len(BAR_OPTIONS) - 1
-            elif ec_elem == "mood":
-                max_idx = extra_start + len(MOOD_EMOJI_SETS) - 1
-            elif ec_elem == "pomodoro":
-                max_idx = extra_start + len(POMO_DURATIONS) - 1
-            elif ec_elem in ("streak", "moon-phase", "cwd"):
-                max_idx = extra_start
-            if key in (curses.KEY_UP, ord("k")):
-                ec_cursor = max(0, ec_cursor - 1)
-            elif key in (curses.KEY_DOWN, ord("j")):
-                ec_cursor = min(max_idx, ec_cursor + 1)
+            _ec_sections = _element_config_sections(ec_elem)
+            _ec_state = dict(
+                color=ec_color, bar=ec_bar, model_set=ec_model_set,
+                mood_set=ec_mood_set, pomo_duration=ec_pomo_duration,
+            )
+
+            if _bare_esc:
+                if stack:
+                    screen, cursor = stack.pop()
+            elif key == curses.KEY_LEFT:
+                ec_section = (ec_section - 1) % len(_ec_sections)
+                ec_option = _ec_snap_option(ec_elem, ec_section, **_ec_state)
+            elif key == curses.KEY_RIGHT:
+                ec_section = (ec_section + 1) % len(_ec_sections)
+                ec_option = _ec_snap_option(ec_elem, ec_section, **_ec_state)
+            elif key == curses.KEY_UP:
+                ec_option = max(0, ec_option - 1)
+            elif key == curses.KEY_DOWN:
+                ec_option = min(_ec_section_max_option(ec_elem, ec_section), ec_option + 1)
             elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
-                _extra = 2 + len(COLOR_OPTIONS)
-                if ec_cursor == 0:
-                    ec_emoji_on = not ec_emoji_on
-                elif ec_cursor == 1:
+                if ec_section == 0:
+                    if ec_option == 0:
+                        ec_emoji_on = not ec_emoji_on
+                    elif ec_elem == "model" and ec_option >= 1:
+                        ec_model_set = ec_option
+                    elif ec_elem == "mood" and ec_option >= 1:
+                        ec_mood_set = ec_option
+                elif ec_section == 1:
                     ec_label_on = not ec_label_on
-                elif ec_cursor >= _extra:
-                    idx = ec_cursor - _extra
-                    if ec_elem == "model":
-                        ec_model_set = idx + 1
-                    elif ec_elem in BAR_ELEMENTS:
-                        ec_bar = BAR_OPTIONS[idx]
-                    elif ec_elem == "mood":
-                        ec_mood_set = idx + 1
+                elif ec_section == 2:
+                    cname, _ = COLOR_OPTIONS[ec_option]
+                    ec_color = None if cname == "none" else cname
+                elif ec_section == 3:
+                    if ec_elem in BAR_ELEMENTS:
+                        ec_bar = BAR_OPTIONS[ec_option]
                     elif ec_elem == "pomodoro":
-                        ec_pomo_duration = POMO_DURATIONS[idx]
+                        ec_pomo_duration = POMO_DURATIONS[ec_option]
                     elif ec_elem == "streak":
                         ec_streak_unit = not ec_streak_unit
                     elif ec_elem == "moon-phase":
                         ec_moon_name = not ec_moon_name
                     elif ec_elem == "cwd":
                         ec_cwd_basename = not ec_cwd_basename
-                else:
-                    cname, _ = COLOR_OPTIONS[ec_cursor - 2]
-                    ec_color = None if cname == "none" else cname
                 # Save immediately
                 sl_settings = cfg.setdefault("statusline", {}).setdefault("element_settings", {})
                 entry = {"emoji": ec_emoji_on, "label": ec_label_on, "color": ec_color, "bar": ec_bar}
@@ -1563,9 +1655,6 @@ def run(stdscr) -> None:
                 sl_settings[ec_elem] = entry
                 save_config(cfg)
                 clear_element_cache()
-            elif key in (ord("q"), curses.KEY_LEFT, ord("h"), 27):
-                if stack:
-                    screen, cursor = stack.pop()
 
             continue
 
@@ -1602,7 +1691,7 @@ def run(stdscr) -> None:
                 else:
                     _bare_esc = True
 
-            if _bare_esc or key == ord("q"):
+            if _bare_esc:
                 if stack:
                     screen, cursor = stack.pop()
                 sl_settings_section = 0
@@ -1611,12 +1700,12 @@ def run(stdscr) -> None:
                 sl_settings_section = (sl_settings_section - 1) % 2
             elif key in (curses.KEY_RIGHT,):
                 sl_settings_section = (sl_settings_section + 1) % 2
-            elif key in (curses.KEY_UP, ord("k")):
+            elif key == curses.KEY_UP:
                 if sl_settings_section == 0:
                     cursor = max(0, cursor - 1)
                 else:
                     sl_settings_color_cursor = max(0, sl_settings_color_cursor - 1)
-            elif key in (curses.KEY_DOWN, ord("j")):
+            elif key == curses.KEY_DOWN:
                 if sl_settings_section == 0:
                     cursor = min(6, cursor + 1)
                 else:
@@ -1709,13 +1798,13 @@ def run(stdscr) -> None:
                     ob_edit_buf += chr(key)
             else:
                 # Navigation mode
-                if _bare_esc or key == ord("q"):
+                if _bare_esc:
                     if stack:
                         screen, cursor = stack.pop()
-                elif key in (curses.KEY_UP, ord("k")):
+                elif key == curses.KEY_UP:
                     ob_cursor = max(OB_IDX_VAULT_PATH, ob_cursor - 1)
                     ob_status_msg = ""
-                elif key in (curses.KEY_DOWN, ord("j")):
+                elif key == curses.KEY_DOWN:
                     ob_cursor = min(OB_IDX_INSTRUCTIONS, ob_cursor + 1)
                     ob_status_msg = ""
                 elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
@@ -1757,11 +1846,11 @@ def run(stdscr) -> None:
                     _bare_esc = True
 
             max_scroll = max(0, len(OBSIDIAN_INSTRUCTIONS) - (stdscr.getmaxyx()[0] - 5))
-            if key in (curses.KEY_UP, ord("k")):
+            if key == curses.KEY_UP:
                 ob_instr_scroll = max(0, ob_instr_scroll - 1)
-            elif key in (curses.KEY_DOWN, ord("j")):
+            elif key == curses.KEY_DOWN:
                 ob_instr_scroll = min(max_scroll, ob_instr_scroll + 1)
-            elif _bare_esc or key == ord("q"):
+            elif _bare_esc:
                 if stack:
                     screen, cursor = stack.pop()
 
@@ -1786,7 +1875,7 @@ def run(stdscr) -> None:
 
             if key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
                 toggle_git_cleanup(not gc_enabled)
-            elif _bare_esc or key in (ord("q"), curses.KEY_LEFT):
+            elif _bare_esc or key == curses.KEY_LEFT:
                 if stack:
                     screen, cursor = stack.pop()
 
@@ -1822,7 +1911,7 @@ def run(stdscr) -> None:
             elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
                 ntype = ntypes[cursor]
                 toggle_notify_type(ntype, not nf_states[ntype])
-            elif _bare_esc or key in (ord("q"), curses.KEY_LEFT):
+            elif _bare_esc or key == curses.KEY_LEFT:
                 if stack:
                     screen, cursor = stack.pop()
 
@@ -1831,34 +1920,42 @@ def run(stdscr) -> None:
         elif screen == "integrations":
             title = "Integrations"
             items = ["Obsidian"]
-            hint = "↑↓ navigate   Enter select   ESC back   q quit"
+            hint = "↑↓ navigate   Enter select   Esc back"
 
         else:
             title = screen.capitalize()
             items = ["(coming soon)"]
-            hint = "← back   q quit"
+            hint = "Esc back"
 
         draw_screen(stdscr, title, items, cursor, hint)
 
         key = stdscr.getch()
 
         # Navigation
-        if key in (curses.KEY_UP, ord("k")):
+        if key == curses.KEY_UP:
             cursor = max(0, cursor - 1)
             if screen.startswith("sound_picker:"):
                 _play_preview(screen.split(":", 1)[1], sounds, cursor)
 
-        elif key in (curses.KEY_DOWN, ord("j")):
+        elif key == curses.KEY_DOWN:
             cursor = min(len(items) - 1, cursor + 1)
             if screen.startswith("sound_picker:"):
                 _play_preview(screen.split(":", 1)[1], sounds, cursor)
 
-        elif key in (curses.KEY_LEFT, ord("h"), 27):  # 27 = Esc
+        elif key in (curses.KEY_LEFT, 27):  # 27 = Esc
             if stack:
                 screen, cursor = stack.pop()
 
-        elif key == ord("q"):
-            break
+        elif key == ord("q") and screen == "main":
+            h, w = stdscr.getmaxyx()
+            msg = "quit? (y/n)"
+            try:
+                stdscr.addstr(h - 2, 2, msg + " " * (w - 2 - len(msg)), curses.A_DIM | curses.A_BOLD)
+            except curses.error:
+                pass
+            stdscr.refresh()
+            if stdscr.getch() in (ord("y"), ord("Y")):
+                break
 
         elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
             if screen == "main":
