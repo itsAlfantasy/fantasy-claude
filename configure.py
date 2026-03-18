@@ -1012,13 +1012,77 @@ def draw_save_confirm(
     stdscr.refresh()
 
 
+def _element_config_sections(element: str) -> list[str]:
+    sections = ["Emoji", "Label", "Color"]
+    if element in BAR_ELEMENTS:
+        sections.append("Bar")
+    elif element == "pomodoro":
+        sections.append("Duration")
+    elif element == "streak":
+        sections.append("Show unit")
+    elif element == "moon-phase":
+        sections.append("Show name")
+    elif element == "cwd":
+        sections.append("Basename")
+    return sections
+
+
+def _ec_section_max_option(element: str, section: int) -> int:
+    """Return the max option index for a given section."""
+    if section == 0:  # Emoji (+ set picker for model/mood)
+        if element == "model":
+            return len(MODEL_EMOJI_SETS) - 1  # toggle + 2 sets
+        if element == "mood":
+            return len(MOOD_EMOJI_SETS)  # toggle + 3 sets
+        return 0
+    if section == 1:  # Label — single toggle
+        return 0
+    if section == 2:  # Color
+        return len(COLOR_OPTIONS) - 1
+    # Section 3 — extra
+    if element in BAR_ELEMENTS:
+        return len(BAR_OPTIONS) - 1  # 2
+    if element == "pomodoro":
+        return len(POMO_DURATIONS) - 1  # 5
+    # streak, moon-phase, cwd — single checkbox
+    return 0
+
+
+def _ec_snap_option(element: str, section: int, **state) -> int:
+    """Return the option index that matches the current selection."""
+    if section == 0:
+        if element == "model":
+            return max(0, state.get("model_set", 1))  # 0=toggle, 1+=sets
+        if element == "mood":
+            return max(0, state.get("mood_set", 1))
+        return 0
+    if section == 1:
+        return 0
+    if section == 2:
+        color = state.get("color")
+        target = color or "none"
+        for i, (cname, _) in enumerate(COLOR_OPTIONS):
+            if cname == target:
+                return i
+        return 0
+    # section 3
+    if element in BAR_ELEMENTS:
+        bar = state.get("bar", "off")
+        return BAR_OPTIONS.index(bar) if bar in BAR_OPTIONS else 0
+    if element == "pomodoro":
+        dur = state.get("pomo_duration", 25)
+        return POMO_DURATIONS.index(dur) if dur in POMO_DURATIONS else 2
+    return 0
+
+
 def draw_element_config(
     stdscr,
     element: str,
     emoji_on: bool,
     label_on: bool,
     color_name: str | None,
-    cursor: int,
+    section: int,
+    option: int,
     bar: str = "off",
     emoji_set: int = 1,
     mood_set: int = 1,
@@ -1030,148 +1094,145 @@ def draw_element_config(
     stdscr.erase()
     h, w = stdscr.getmaxyx()
 
-    if element == "model":
-        cur_set = MODEL_EMOJI_SETS[emoji_set] if emoji_set in (1, 2) else MODEL_EMOJI_SETS[1]
-        emoji_char = " ".join(cur_set.values())
-    elif element == "mood":
-        emoji_char = " ".join(MOOD_EMOJI_SETS.get(1, []))
-    else:
-        emoji_char = ELEMENT_EMOJIS.get(element, "")
-    label_word = ELEMENT_LABELS.get(element, "")
     title = f"claude-hooks · Element: {element}"
     stdscr.addstr(0, 0, f"  {title}  "[:w], curses.A_BOLD)
     stdscr.addstr(1, 0, "─" * min(w, 60))
 
+    sections = _element_config_sections(element)
+
+    # Tab bar — row 3
     row = 3
-    emoji_text = f"{'[x]' if emoji_on else '[ ]'} Emoji: {emoji_char}" if emoji_char else "[ ] Emoji: (none available)"
-    if cursor == 0:
-        stdscr.addstr(row, 2, f"> {emoji_text}"[:w - 2], curses.A_REVERSE)
-    else:
-        stdscr.addstr(row, 2, f"  {emoji_text}"[:w - 2])
+    col = 2
+    for si, sname in enumerate(sections):
+        if si == section:
+            tab_text = f"  [ {sname} ]  "
+        else:
+            tab_text = f"  {sname}  "
+        try:
+            attr = curses.A_REVERSE if si == section else curses.A_NORMAL
+            stdscr.addstr(row, col, tab_text[:max(0, w - col)], attr)
+        except curses.error:
+            pass
+        col += len(tab_text)
     row += 1
+    try:
+        stdscr.addstr(row, 0, "─" * min(w, 60))
+    except curses.error:
+        pass
+    row += 2  # row 6
 
-    label_text = f"{'[x]' if label_on else '[ ]'} Label: {label_word}" if label_word else "[ ] Label: (none available)"
-    if cursor == 1:
-        stdscr.addstr(row, 2, f"> {label_text}"[:w - 2], curses.A_REVERSE)
-    else:
-        stdscr.addstr(row, 2, f"  {label_text}"[:w - 2])
-    row += 2
-
-    stdscr.addstr(row, 2, "Color:"[:w - 2], curses.A_BOLD)
-    row += 1
-
-    for i, (cname, _) in enumerate(COLOR_OPTIONS):
-        list_idx = i + 2
-        is_selected = cname == (color_name or "none")
-        marker = "●" if is_selected else "○"
-        label = f"{marker} {cname}"
-        pair_idx = CURSES_COLOR_MAP.get(cname, 0)
-        color_attr = curses.color_pair(pair_idx) if pair_idx else curses.A_NORMAL
-        if list_idx == cursor:
-            stdscr.addstr(row, 2, f"> {label}"[:w - 2], curses.A_REVERSE)
-        elif is_selected:
-            stdscr.addstr(row, 2, f"  {label}"[:w - 2], color_attr | curses.A_BOLD)
+    # Section content
+    if section == 0:  # Emoji (+ set picker for model/mood)
+        emoji_char = ELEMENT_EMOJIS.get(element, "")
+        marker = "[x]" if emoji_on else "[ ]"
+        text = f"{marker} Enable emoji: {emoji_char}" if emoji_char else f"{marker} Enable emoji: (none available)"
+        if option == 0:
+            stdscr.addstr(row, 2, f"> {text}"[:w - 2], curses.A_REVERSE)
         else:
-            stdscr.addstr(row, 2, f"  {label}"[:w - 2])
+            stdscr.addstr(row, 2, f"  {text}"[:w - 2])
         row += 1
 
-    extra_start = 2 + len(COLOR_OPTIONS)
+        if element == "model":
+            row += 1
+            stdscr.addstr(row, 2, "Emoji set:"[:w - 2], curses.A_BOLD)
+            row += 1
+            for i, set_map in enumerate(MODEL_EMOJI_SETS[1:], start=1):
+                if row >= h - 3:
+                    break
+                is_sel = emoji_set == i
+                mk = "●" if is_sel else "○"
+                icons = " ".join(set_map.values())
+                opt_label = f"{mk} set {i}  {icons}"
+                if option == i:
+                    stdscr.addstr(row, 2, f"> {opt_label}"[:w - 2], curses.A_REVERSE)
+                else:
+                    stdscr.addstr(row, 2, f"  {opt_label}"[:w - 2])
+                row += 1
 
-    if element == "model" and row < h - 5:
-        row += 1
-        stdscr.addstr(row, 2, "Emoji set:"[:w - 2], curses.A_BOLD)
-        row += 1
-        for i, set_map in enumerate(MODEL_EMOJI_SETS[1:], start=1):
-            list_idx = extra_start + (i - 1)
-            marker = "●" if emoji_set == i else "○"
-            icons = " ".join(set_map.values())
-            opt_label = f"{marker} set {i}  {icons}"
-            if list_idx == cursor:
-                stdscr.addstr(row, 2, f"> {opt_label}"[:w - 2], curses.A_REVERSE)
+        elif element == "mood":
+            row += 1
+            stdscr.addstr(row, 2, "Emoji set:"[:w - 2], curses.A_BOLD)
+            row += 1
+            for i, emojis in MOOD_EMOJI_SETS.items():
+                if row >= h - 3:
+                    break
+                is_sel = mood_set == i
+                mk = "●" if is_sel else "○"
+                preview = " ".join(emojis)
+                opt_label = f"{mk} set {i}  {preview}"
+                if option == i:
+                    stdscr.addstr(row, 2, f"> {opt_label}"[:w - 2], curses.A_REVERSE)
+                else:
+                    stdscr.addstr(row, 2, f"  {opt_label}"[:w - 2])
+                row += 1
+
+    elif section == 1:  # Label
+        label_word = ELEMENT_LABELS.get(element, "")
+        marker = "[x]" if label_on else "[ ]"
+        text = f"{marker} Enable label: {label_word}" if label_word else f"{marker} Enable label: (none available)"
+        stdscr.addstr(row, 2, f"> {text}"[:w - 2], curses.A_REVERSE)
+
+    elif section == 2:  # Color
+        for i, (cname, _) in enumerate(COLOR_OPTIONS):
+            if row >= h - 3:
+                break
+            is_selected = cname == (color_name or "none")
+            marker = "●" if is_selected else "○"
+            label = f"{marker} {cname}"
+            pair_idx = CURSES_COLOR_MAP.get(cname, 0)
+            color_attr = curses.color_pair(pair_idx) if pair_idx else curses.A_NORMAL
+            if i == option:
+                stdscr.addstr(row, 2, f"> {label}"[:w - 2], curses.A_REVERSE)
+            elif is_selected:
+                stdscr.addstr(row, 2, f"  {label}"[:w - 2], color_attr | curses.A_BOLD)
             else:
-                stdscr.addstr(row, 2, f"  {opt_label}"[:w - 2])
+                stdscr.addstr(row, 2, f"  {label}"[:w - 2])
             row += 1
 
-    if element in BAR_ELEMENTS and row < h - 6:
-        row += 1
-        stdscr.addstr(row, 2, "Bar:"[:w - 2], curses.A_BOLD)
-        row += 1
-        for i, opt in enumerate(BAR_OPTIONS):
-            list_idx = extra_start + i
-            marker = "●" if opt == (bar or "off") else "○"
-            opt_label = f"{marker} {opt}"
-            if list_idx == cursor:
-                stdscr.addstr(row, 2, f"> {opt_label}"[:w - 2], curses.A_REVERSE)
-            else:
-                stdscr.addstr(row, 2, f"  {opt_label}"[:w - 2])
-            row += 1
+    elif section == 3:  # Extra
+        if element in BAR_ELEMENTS:
+            for i, opt in enumerate(BAR_OPTIONS):
+                if row >= h - 3:
+                    break
+                marker = "●" if opt == (bar or "off") else "○"
+                opt_label = f"{marker} {opt}"
+                if i == option:
+                    stdscr.addstr(row, 2, f"> {opt_label}"[:w - 2], curses.A_REVERSE)
+                else:
+                    stdscr.addstr(row, 2, f"  {opt_label}"[:w - 2])
+                row += 1
 
-    if element == "mood" and row < h - 5:
-        row += 1
-        stdscr.addstr(row, 2, "Emoji set:"[:w - 2], curses.A_BOLD)
-        row += 1
-        for i, emojis in MOOD_EMOJI_SETS.items():
-            list_idx = extra_start + (i - 1)
-            marker = "●" if mood_set == i else "○"
-            preview = " ".join(emojis)
-            opt_label = f"{marker} set {i}  {preview}"
-            if list_idx == cursor:
-                stdscr.addstr(row, 2, f"> {opt_label}"[:w - 2], curses.A_REVERSE)
-            else:
-                stdscr.addstr(row, 2, f"  {opt_label}"[:w - 2])
-            row += 1
+        elif element == "pomodoro":
+            for i, mins in enumerate(POMO_DURATIONS):
+                if row >= h - 3:
+                    break
+                marker = "●" if pomo_duration == mins else "○"
+                opt_label = f"{marker} {mins} min"
+                if i == option:
+                    stdscr.addstr(row, 2, f"> {opt_label}"[:w - 2], curses.A_REVERSE)
+                else:
+                    stdscr.addstr(row, 2, f"  {opt_label}"[:w - 2])
+                row += 1
 
-    if element == "pomodoro" and row < h - 5:
-        row += 1
-        stdscr.addstr(row, 2, "Duration:"[:w - 2], curses.A_BOLD)
-        row += 1
-        for i, mins in enumerate(POMO_DURATIONS):
-            list_idx = extra_start + i
-            marker = "●" if pomo_duration == mins else "○"
-            opt_label = f"{marker} {mins} min"
-            if list_idx == cursor:
-                stdscr.addstr(row, 2, f"> {opt_label}"[:w - 2], curses.A_REVERSE)
-            else:
-                stdscr.addstr(row, 2, f"  {opt_label}"[:w - 2])
-            row += 1
+        elif element == "streak":
+            marker = "[x]" if streak_unit else "[ ]"
+            text = f"{marker} Show unit  (e.g. '5 days' vs '5d')"
+            stdscr.addstr(row, 2, f"> {text}"[:w - 2], curses.A_REVERSE)
 
-    if element == "streak" and row < h - 5:
-        row += 1
-        list_idx = extra_start
-        marker = "[x]" if streak_unit else "[ ]"
-        unit_label = f"{marker} Show unit  (e.g. '5 days' vs '5d')"
-        if list_idx == cursor:
-            stdscr.addstr(row, 2, f"> {unit_label}"[:w - 2], curses.A_REVERSE)
-        else:
-            stdscr.addstr(row, 2, f"  {unit_label}"[:w - 2])
-        row += 1
+        elif element == "moon-phase":
+            marker = "[x]" if moon_name else "[ ]"
+            text = f"{marker} Show phase name  (e.g. '🌗 Last Quarter')"
+            stdscr.addstr(row, 2, f"> {text}"[:w - 2], curses.A_REVERSE)
 
-    if element == "moon-phase" and row < h - 5:
-        row += 1
-        list_idx = extra_start
-        marker = "[x]" if moon_name else "[ ]"
-        name_label = f"{marker} Show phase name  (e.g. '🌗 Last Quarter')"
-        if list_idx == cursor:
-            stdscr.addstr(row, 2, f"> {name_label}"[:w - 2], curses.A_REVERSE)
-        else:
-            stdscr.addstr(row, 2, f"  {name_label}"[:w - 2])
-        row += 1
-
-    if element == "cwd" and row < h - 5:
-        row += 1
-        list_idx = extra_start
-        marker = "[x]" if cwd_basename else "[ ]"
-        bn_label = f"{marker} Basename only  (e.g. 'my-project' vs '~/Dev/my-project')"
-        if list_idx == cursor:
-            stdscr.addstr(row, 2, f"> {bn_label}"[:w - 2], curses.A_REVERSE)
-        else:
-            stdscr.addstr(row, 2, f"  {bn_label}"[:w - 2])
-        row += 1
+        elif element == "cwd":
+            marker = "[x]" if cwd_basename else "[ ]"
+            text = f"{marker} Basename only  (e.g. 'my-project' vs '~/Dev/my-project')"
+            stdscr.addstr(row, 2, f"> {text}"[:w - 2], curses.A_REVERSE)
 
     footer_row = h - 2
     if footer_row > row + 1:
         stdscr.addstr(footer_row - 1, 2, "─" * min(w - 4, 56))
-    hint = "↑↓ navigate   Enter toggle/select   Esc back"
+    hint = "←→ section   ↑↓ navigate   Enter toggle/select   Esc back"
     if footer_row < h:
         stdscr.addstr(footer_row, 2, hint[:w - 2], curses.A_DIM)
 
@@ -1327,7 +1388,8 @@ def run(stdscr) -> None:
     ec_streak_unit: bool = True
     ec_moon_name: bool = False
     ec_cwd_basename: bool = False
-    ec_cursor: int = 0
+    ec_section: int = 0
+    ec_option: int = 0
 
     # Statusline settings screen state
     sl_settings_section: int = 0      # 0 = Number of lines, 1 = General color
@@ -1478,7 +1540,8 @@ def run(stdscr) -> None:
                 ec_streak_unit = settings.get("show_unit", True)
                 ec_moon_name = settings.get("show_name", False)
                 ec_cwd_basename = settings.get("basename_only", False)
-                ec_cursor = 0
+                ec_section = 0
+                ec_option = 0
                 stack.append((screen, cursor))
                 screen = "element_config"
                 cursor = 0
@@ -1509,10 +1572,11 @@ def run(stdscr) -> None:
             continue
 
         elif screen == "element_config":
-            draw_element_config(stdscr, ec_elem, ec_emoji_on, ec_label_on, ec_color, ec_cursor, ec_bar, ec_model_set, ec_mood_set, ec_pomo_duration, ec_streak_unit, ec_moon_name, ec_cwd_basename)
+            draw_element_config(stdscr, ec_elem, ec_emoji_on, ec_label_on, ec_color, ec_section, ec_option, ec_bar, ec_model_set, ec_mood_set, ec_pomo_duration, ec_streak_unit, ec_moon_name, ec_cwd_basename)
             key = stdscr.getch()
 
             # ESC sequence handling
+            _bare_esc = False
             if key == 27:
                 stdscr.nodelay(True)
                 k2 = stdscr.getch()
@@ -1523,50 +1587,56 @@ def run(stdscr) -> None:
                         key = curses.KEY_UP
                     elif k3 == ord("B"):
                         key = curses.KEY_DOWN
+                    elif k3 == ord("C"):
+                        key = curses.KEY_RIGHT
                     elif k3 == ord("D"):
                         key = curses.KEY_LEFT
+                else:
+                    _bare_esc = True
 
-            extra_start = 2 + len(COLOR_OPTIONS)
-            max_idx = extra_start - 1
-            if ec_elem == "model":
-                max_idx = extra_start + len(MODEL_EMOJI_SETS) - 2
-            elif ec_elem in BAR_ELEMENTS:
-                max_idx = extra_start + len(BAR_OPTIONS) - 1
-            elif ec_elem == "mood":
-                max_idx = extra_start + len(MOOD_EMOJI_SETS) - 1
-            elif ec_elem == "pomodoro":
-                max_idx = extra_start + len(POMO_DURATIONS) - 1
-            elif ec_elem in ("streak", "moon-phase", "cwd"):
-                max_idx = extra_start
-            if key == curses.KEY_UP:
-                ec_cursor = max(0, ec_cursor - 1)
+            _ec_sections = _element_config_sections(ec_elem)
+            _ec_state = dict(
+                color=ec_color, bar=ec_bar, model_set=ec_model_set,
+                mood_set=ec_mood_set, pomo_duration=ec_pomo_duration,
+            )
+
+            if _bare_esc:
+                if stack:
+                    screen, cursor = stack.pop()
+            elif key == curses.KEY_LEFT:
+                ec_section = (ec_section - 1) % len(_ec_sections)
+                ec_option = _ec_snap_option(ec_elem, ec_section, **_ec_state)
+            elif key == curses.KEY_RIGHT:
+                ec_section = (ec_section + 1) % len(_ec_sections)
+                ec_option = _ec_snap_option(ec_elem, ec_section, **_ec_state)
+            elif key == curses.KEY_UP:
+                ec_option = max(0, ec_option - 1)
             elif key == curses.KEY_DOWN:
-                ec_cursor = min(max_idx, ec_cursor + 1)
+                ec_option = min(_ec_section_max_option(ec_elem, ec_section), ec_option + 1)
             elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
-                _extra = 2 + len(COLOR_OPTIONS)
-                if ec_cursor == 0:
-                    ec_emoji_on = not ec_emoji_on
-                elif ec_cursor == 1:
+                if ec_section == 0:
+                    if ec_option == 0:
+                        ec_emoji_on = not ec_emoji_on
+                    elif ec_elem == "model" and ec_option >= 1:
+                        ec_model_set = ec_option
+                    elif ec_elem == "mood" and ec_option >= 1:
+                        ec_mood_set = ec_option
+                elif ec_section == 1:
                     ec_label_on = not ec_label_on
-                elif ec_cursor >= _extra:
-                    idx = ec_cursor - _extra
-                    if ec_elem == "model":
-                        ec_model_set = idx + 1
-                    elif ec_elem in BAR_ELEMENTS:
-                        ec_bar = BAR_OPTIONS[idx]
-                    elif ec_elem == "mood":
-                        ec_mood_set = idx + 1
+                elif ec_section == 2:
+                    cname, _ = COLOR_OPTIONS[ec_option]
+                    ec_color = None if cname == "none" else cname
+                elif ec_section == 3:
+                    if ec_elem in BAR_ELEMENTS:
+                        ec_bar = BAR_OPTIONS[ec_option]
                     elif ec_elem == "pomodoro":
-                        ec_pomo_duration = POMO_DURATIONS[idx]
+                        ec_pomo_duration = POMO_DURATIONS[ec_option]
                     elif ec_elem == "streak":
                         ec_streak_unit = not ec_streak_unit
                     elif ec_elem == "moon-phase":
                         ec_moon_name = not ec_moon_name
                     elif ec_elem == "cwd":
                         ec_cwd_basename = not ec_cwd_basename
-                else:
-                    cname, _ = COLOR_OPTIONS[ec_cursor - 2]
-                    ec_color = None if cname == "none" else cname
                 # Save immediately
                 sl_settings = cfg.setdefault("statusline", {}).setdefault("element_settings", {})
                 entry = {"emoji": ec_emoji_on, "label": ec_label_on, "color": ec_color, "bar": ec_bar}
@@ -1585,9 +1655,6 @@ def run(stdscr) -> None:
                 sl_settings[ec_elem] = entry
                 save_config(cfg)
                 clear_element_cache()
-            elif key in (curses.KEY_LEFT, 27):
-                if stack:
-                    screen, cursor = stack.pop()
 
             continue
 
