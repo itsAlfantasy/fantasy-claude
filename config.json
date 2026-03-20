@@ -10,13 +10,13 @@
       ],
       [
         "context-pct",
-        "burn-rate",
-        "session-cost"
+        "usage-5h",
+        "reset-time"
       ],
       [
         "streak",
-        "usage-5h",
-        "reset-time"
+        "session-cost",
+        "burn-rate"
       ]
     ],
     "element_settings": {
@@ -47,7 +47,7 @@
       "context-pct": {
         "emoji": true,
         "label": false,
-        "color": "orange",
+        "color": null,
         "bar": "multi"
       },
       "datetime": {
@@ -80,7 +80,7 @@
       "model": {
         "emoji": true,
         "label": false,
-        "color": null,
+        "color": "lavender",
         "bar": "off",
         "emoji_set": 2
       },
@@ -100,7 +100,7 @@
       "streak": {
         "emoji": true,
         "label": false,
-        "color": null,
+        "color": "orange",
         "bar": "off",
         "show_unit": true
       },
