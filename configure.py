@@ -1356,6 +1356,7 @@ def _play_preview(event: str, sounds: list[str], cursor: int) -> None:
 
 def run(stdscr) -> None:
     curses.curs_set(0)
+    curses.set_escdelay(25)
     try:
         curses.use_default_colors()
     except Exception:
