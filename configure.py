@@ -25,7 +25,24 @@ EVENT_LABELS = {
 }
 
 HOOKS_ITEMS = ["on_error", "on_stop", "on_notification"]
-MAIN_ITEMS = ["Hooks", "Statusline", "Integrations"]
+MAIN_ITEMS = ["Hooks", "Statusline", "Integrations", "Various Customizations"]
+
+VARIOUS_ITEMS = ["PR and Commit Attribution"]
+
+ATTRIBUTION_PRESETS_COMMIT = [
+    ("Default Claude Code", "\U0001f916 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>"),
+    ("Co-Authored-By only", "Co-Authored-By: Claude <noreply@anthropic.com>"),
+    ("No attribution", ""),
+    ("Custom", None),
+]
+
+ATTRIBUTION_PRESETS_PR = [
+    ("Default Claude Code", "\U0001f916 Generated with [Claude Code](https://claude.com/claude-code)"),
+    ("No attribution", ""),
+    ("Custom", None),
+]
+
+ATTRIBUTION_DESCRIPTION = "Configure the attribution text Claude Code adds to your git commits and PR descriptions."
 MAX_ELEMENTS_PER_LINE = 4
 
 _element_cache: dict[str, str] = {}  # name -> raw_output
@@ -469,6 +486,19 @@ def _save_settings(data: dict) -> None:
     SETTINGS_PATH.write_text(json.dumps(data, indent=2) + "\n")
 
 
+def _get_attribution_presets(target: str) -> list[tuple[str, str | None]]:
+    return ATTRIBUTION_PRESETS_COMMIT if target == "commit" else ATTRIBUTION_PRESETS_PR
+
+
+def _detect_attribution_preset(value: str | None, target: str) -> str:
+    if value is None:
+        return "Default Claude Code"
+    for label, preset_val in _get_attribution_presets(target):
+        if preset_val is not None and preset_val == value:
+            return label
+    return "Custom"
+
+
 def is_git_cleanup_enabled() -> bool:
     settings = _load_settings()
     hooks = settings.get("hooks", {})
@@ -754,6 +784,143 @@ def draw_obsidian_config(
             pass
     try:
         stdscr.addstr(footer_row, 2, "↑↓ navigate   Enter edit/action   ESC back"[:w - 2], curses.A_DIM)
+    except curses.error:
+        pass
+    stdscr.refresh()
+
+
+def draw_various_screen(stdscr, cursor: int, settings: dict) -> None:
+    stdscr.erase()
+    h, w = stdscr.getmaxyx()
+
+    header = f"  fantasy-claude v{VERSION} · Various Customizations  "
+    stdscr.addstr(0, 0, header[:w], curses.A_BOLD)
+    stdscr.addstr(1, 0, "─" * min(w, 60))
+
+    row = 3
+    for i, item_label in enumerate(VARIOUS_ITEMS):
+        if row >= h - 3:
+            break
+        suffix = ""
+        if item_label == "PR and Commit Attribution":
+            attr = settings.get("attribution", {})
+            c_preset = _detect_attribution_preset(attr.get("commit"), "commit")
+            p_preset = _detect_attribution_preset(attr.get("pr"), "pr")
+            suffix = f"  [{c_preset} / {p_preset}]"
+        text = f"{'> ' if i == cursor else '  '}{item_label}{suffix}"
+        attr_flag = curses.A_REVERSE if i == cursor else 0
+        try:
+            stdscr.addstr(row, 2, text[:w - 2], attr_flag)
+        except curses.error:
+            pass
+        row += 1
+
+    footer_row = h - 2
+    if footer_row - 1 > row + 1:
+        try:
+            stdscr.addstr(footer_row - 1, 2, "─" * min(w - 4, 56))
+        except curses.error:
+            pass
+    try:
+        stdscr.addstr(footer_row, 2, "↑↓ navigate   Enter select   Esc back"[:w - 2], curses.A_DIM)
+    except curses.error:
+        pass
+    stdscr.refresh()
+
+
+def draw_attribution_screen(stdscr, cursor: int, settings: dict) -> None:
+    stdscr.erase()
+    h, w = stdscr.getmaxyx()
+
+    header = f"  fantasy-claude v{VERSION} · PR and Commit Attribution  "
+    stdscr.addstr(0, 0, header[:w], curses.A_BOLD)
+    stdscr.addstr(1, 0, "─" * min(w, 60))
+
+    # Description
+    row = 3
+    desc = ATTRIBUTION_DESCRIPTION
+    while desc and row < h - 6:
+        chunk = desc[:w - 4]
+        try:
+            stdscr.addstr(row, 2, chunk, curses.A_DIM)
+        except curses.error:
+            pass
+        desc = desc[len(chunk):]
+        row += 1
+    row += 1
+
+    attr = settings.get("attribution", {})
+    targets = [("commit", "Commit"), ("pr", "PR")]
+    for i, (key, label) in enumerate(targets):
+        if row >= h - 3:
+            break
+        preset = _detect_attribution_preset(attr.get(key), key)
+        text = f"{'> ' if i == cursor else '  '}{label:<10} [{preset}]"
+        attr_flag = curses.A_REVERSE if i == cursor else 0
+        try:
+            stdscr.addstr(row, 2, text[:w - 2], attr_flag)
+        except curses.error:
+            pass
+        row += 1
+
+    footer_row = h - 2
+    if footer_row - 1 > row + 1:
+        try:
+            stdscr.addstr(footer_row - 1, 2, "─" * min(w - 4, 56))
+        except curses.error:
+            pass
+    try:
+        stdscr.addstr(footer_row, 2, "↑↓ navigate   Enter select   Esc back"[:w - 2], curses.A_DIM)
+    except curses.error:
+        pass
+    stdscr.refresh()
+
+
+def draw_attribution_picker(stdscr, target: str, cursor: int, custom_buf: str, custom_active: bool, status_msg: str = "") -> None:
+    stdscr.erase()
+    h, w = stdscr.getmaxyx()
+
+    label = "Commit" if target == "commit" else "PR"
+    header = f"  fantasy-claude v{VERSION} · {label} Attribution  "
+    stdscr.addstr(0, 0, header[:w], curses.A_BOLD)
+    stdscr.addstr(1, 0, "─" * min(w, 60))
+
+    presets = _get_attribution_presets(target)
+    row = 3
+    for i, (preset_label, preset_val) in enumerate(presets):
+        if row >= h - 3:
+            break
+        is_custom = preset_val is None
+        prefix = "> " if i == cursor else "  "
+        attr_flag = curses.A_REVERSE if i == cursor else 0
+
+        if is_custom and custom_active:
+            text = f"{prefix}{preset_label}: {custom_buf}_"
+            try:
+                stdscr.addstr(row, 2, text[:w - 2], curses.A_BOLD)
+            except curses.error:
+                pass
+        else:
+            try:
+                stdscr.addstr(row, 2, f"{prefix}{preset_label}"[:w - 2], attr_flag)
+            except curses.error:
+                pass
+        row += 1
+
+    footer_row = h - 2
+    if status_msg:
+        try:
+            stdscr.addstr(footer_row - 1, 2, status_msg[:w - 2], curses.A_BOLD)
+        except curses.error:
+            pass
+    elif footer_row - 1 > row + 1:
+        try:
+            stdscr.addstr(footer_row - 1, 2, "─" * min(w - 4, 56))
+        except curses.error:
+            pass
+    hint = "Enter confirm   Esc back" if custom_active else "↑↓ navigate   Enter select   Esc back"
+    try:
+        stdscr.addstr(footer_row, 2, hint[:w - 2], curses.A_DIM)
     except curses.error:
         pass
     stdscr.refresh()
@@ -1407,6 +1574,17 @@ def run(stdscr) -> None:
     ob_integ: dict = {}
     ob_instr_scroll: int = 0
 
+    # Various Customizations state
+    various_cursor: int = 0
+
+    # Attribution state
+    attr_cursor: int = 0
+    attr_pick_cursor: int = 0
+    attr_pick_target: str = "commit"
+    attr_pick_custom_buf: str = ""
+    attr_pick_custom_active: bool = False
+    attr_pick_status_msg: str = ""
+
     while True:
         # --- Build display for current screen ---
         if screen == "main":
@@ -1919,6 +2097,147 @@ def run(stdscr) -> None:
 
             continue
 
+        elif screen == "various":
+            _settings = _load_settings()
+            draw_various_screen(stdscr, various_cursor, _settings)
+            key = stdscr.getch()
+
+            _bare_esc = False
+            if key == 27:
+                stdscr.nodelay(True)
+                k2 = stdscr.getch()
+                k3 = stdscr.getch()
+                stdscr.nodelay(False)
+                if k2 == ord("["):
+                    if k3 == ord("A"):
+                        key = curses.KEY_UP
+                    elif k3 == ord("B"):
+                        key = curses.KEY_DOWN
+                else:
+                    _bare_esc = True
+
+            if _bare_esc:
+                if stack:
+                    screen, cursor = stack.pop()
+            elif key == curses.KEY_UP:
+                various_cursor = max(0, various_cursor - 1)
+            elif key == curses.KEY_DOWN:
+                various_cursor = min(len(VARIOUS_ITEMS) - 1, various_cursor + 1)
+            elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
+                if VARIOUS_ITEMS[various_cursor] == "PR and Commit Attribution":
+                    attr_cursor = 0
+                    stack.append((screen, cursor))
+                    screen = "attribution"
+                    cursor = 0
+            continue
+
+        elif screen == "attribution":
+            _settings = _load_settings()
+            draw_attribution_screen(stdscr, attr_cursor, _settings)
+            key = stdscr.getch()
+
+            _bare_esc = False
+            if key == 27:
+                stdscr.nodelay(True)
+                k2 = stdscr.getch()
+                k3 = stdscr.getch()
+                stdscr.nodelay(False)
+                if k2 == ord("["):
+                    if k3 == ord("A"):
+                        key = curses.KEY_UP
+                    elif k3 == ord("B"):
+                        key = curses.KEY_DOWN
+                else:
+                    _bare_esc = True
+
+            if _bare_esc:
+                if stack:
+                    screen, cursor = stack.pop()
+            elif key == curses.KEY_UP:
+                attr_cursor = max(0, attr_cursor - 1)
+            elif key == curses.KEY_DOWN:
+                attr_cursor = min(1, attr_cursor + 1)
+            elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
+                attr_pick_target = "commit" if attr_cursor == 0 else "pr"
+                presets = _get_attribution_presets(attr_pick_target)
+                # Find current preset index
+                _settings = _load_settings()
+                current_val = _settings.get("attribution", {}).get(attr_pick_target)
+                attr_pick_cursor = 0
+                for pi, (_, pval) in enumerate(presets):
+                    if pval is not None and pval == current_val:
+                        attr_pick_cursor = pi
+                        break
+                attr_pick_custom_active = False
+                attr_pick_custom_buf = ""
+                attr_pick_status_msg = ""
+                stack.append((screen, cursor))
+                screen = "attribution_picker"
+                cursor = 0
+            continue
+
+        elif screen == "attribution_picker":
+            draw_attribution_picker(stdscr, attr_pick_target, attr_pick_cursor, attr_pick_custom_buf, attr_pick_custom_active, attr_pick_status_msg)
+            key = stdscr.getch()
+
+            _bare_esc = False
+            if key == 27:
+                stdscr.nodelay(True)
+                k2 = stdscr.getch()
+                k3 = stdscr.getch()
+                stdscr.nodelay(False)
+                if k2 == ord("["):
+                    if k3 == ord("A"):
+                        key = curses.KEY_UP
+                    elif k3 == ord("B"):
+                        key = curses.KEY_DOWN
+                else:
+                    _bare_esc = True
+
+            presets = _get_attribution_presets(attr_pick_target)
+
+            if attr_pick_custom_active:
+                # Text input mode for custom attribution
+                if key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
+                    _settings = _load_settings()
+                    _settings.setdefault("attribution", {})[attr_pick_target] = attr_pick_custom_buf
+                    _save_settings(_settings)
+                    attr_pick_custom_active = False
+                    attr_pick_status_msg = "Saved"
+                elif _bare_esc:
+                    attr_pick_custom_active = False
+                    attr_pick_custom_buf = ""
+                elif key in (127, curses.KEY_BACKSPACE):
+                    attr_pick_custom_buf = attr_pick_custom_buf[:-1]
+                elif 32 <= key <= 126:
+                    attr_pick_custom_buf += chr(key)
+            else:
+                if _bare_esc:
+                    if stack:
+                        screen, cursor = stack.pop()
+                elif key == curses.KEY_UP:
+                    attr_pick_cursor = max(0, attr_pick_cursor - 1)
+                    attr_pick_status_msg = ""
+                elif key == curses.KEY_DOWN:
+                    attr_pick_cursor = min(len(presets) - 1, attr_pick_cursor + 1)
+                    attr_pick_status_msg = ""
+                elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
+                    preset_label, preset_val = presets[attr_pick_cursor]
+                    if preset_val is None:
+                        # Custom: activate text input
+                        _settings = _load_settings()
+                        current = _settings.get("attribution", {}).get(attr_pick_target, "")
+                        attr_pick_custom_buf = current if _detect_attribution_preset(current, attr_pick_target) == "Custom" else ""
+                        attr_pick_custom_active = True
+                        attr_pick_status_msg = ""
+                    else:
+                        # Preset: save immediately
+                        _settings = _load_settings()
+                        _settings.setdefault("attribution", {})[attr_pick_target] = preset_val
+                        _save_settings(_settings)
+                        attr_pick_status_msg = "Saved"
+            continue
+
         elif screen == "integrations":
             title = "Integrations"
             items = ["Obsidian"]
@@ -1969,6 +2288,11 @@ def run(stdscr) -> None:
                 elif choice == "Integrations":
                     stack.append((screen, cursor))
                     screen = "integrations"
+                    cursor = 0
+                elif choice == "Various Customizations":
+                    various_cursor = 0
+                    stack.append((screen, cursor))
+                    screen = "various"
                     cursor = 0
                 else:
                     stack.append((screen, cursor))
