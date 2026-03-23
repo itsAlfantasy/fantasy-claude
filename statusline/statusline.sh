@@ -8,28 +8,26 @@ ELEMENTS_DIR="$REPO_DIR/statusline/elements"
 
 # Read stdin JSON from Claude Code statusline API and export env vars for element scripts
 _STDIN=$(cat)
-export CLAUDE_MODEL=$(echo "$_STDIN" | $PYTHON_BIN -c "
-import sys,json
-d=json.load(sys.stdin)
-print(d.get('model',{}).get('display_name',''))
-" 2>/dev/null)
-export CLAUDE_CONTEXT_PCT=$(echo "$_STDIN" | $PYTHON_BIN -c "
-import sys,json
-d=json.load(sys.stdin)
-pct=d.get('context_window',{}).get('used_percentage')
+{
+  IFS= read -r CLAUDE_MODEL
+  IFS= read -r CLAUDE_CONTEXT_PCT
+  IFS= read -r CLAUDE_COST_USD
+  IFS= read -r CLAUDE_CONTEXT_SIZE
+} < <(echo "$_STDIN" | $PYTHON_BIN -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    d = {}
+cw = d.get('context_window', {})
+pct = cw.get('used_percentage')
+cost = d.get('cost', {}).get('total_cost_usd')
+print(d.get('model', {}).get('display_name', ''))
 print('' if pct is None else str(round(pct)))
-" 2>/dev/null)
-export CLAUDE_COST_USD=$(echo "$_STDIN" | $PYTHON_BIN -c "
-import sys,json
-d=json.load(sys.stdin)
-cost=d.get('cost',{}).get('total_cost_usd')
 print('' if cost is None else str(cost))
+print(cw.get('context_window_size', ''))
 " 2>/dev/null)
-export CLAUDE_CONTEXT_SIZE=$(echo "$_STDIN" | $PYTHON_BIN -c "
-import sys,json
-d=json.load(sys.stdin)
-print(d.get('context_window',{}).get('context_window_size',''))
-" 2>/dev/null)
+export CLAUDE_MODEL CLAUDE_CONTEXT_PCT CLAUDE_COST_USD CLAUDE_CONTEXT_SIZE
 
 BAR_WIDTH=8
 

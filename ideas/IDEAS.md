@@ -107,3 +107,11 @@ Add this so Claude relays the hook output at the start of each session:
 ## Session Start
 - When you receive output from the `session-git-cleanup` hook, always relay it to the user as your first message.
 ```
+
+## Attribution Settings
+
+Configure Claude Code's commit and PR attribution settings from the TUI configurator or CLI.
+
+Could live under the Integrations screen or a new Settings screen. Would read/write the attribution keys in `~/.claude/settings.json`.
+
+Reference: https://code.claude.com/docs/en/settings#attribution-settings

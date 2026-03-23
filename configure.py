@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Interactive TUI configurator for claude-hooks."""
+"""Interactive TUI configurator for fantasy-claude."""
 
 import curses
 import json
 import platform
+import shutil
 import subprocess
 import unicodedata
 from pathlib import Path
@@ -224,7 +225,7 @@ def preview_sound(sound_path: Path) -> None:
         )
     else:
         for player in ("paplay", "aplay"):
-            if subprocess.run(["command", "-v", player], capture_output=True).returncode == 0:
+            if shutil.which(player):
                 _preview_proc = subprocess.Popen(
                     [player, str(sound_path)],
                     stdout=subprocess.DEVNULL,
@@ -558,7 +559,7 @@ def draw_notify_config(stdscr, states: dict[str, bool], cursor: int) -> None:
     stdscr.erase()
     h, w = stdscr.getmaxyx()
 
-    header = "  claude-hooks · Hooks › Notifications  "
+    header = "  fantasy-claude · Hooks › Notifications  "
     stdscr.addstr(0, 0, header[:w], curses.A_BOLD)
     stdscr.addstr(1, 0, "─" * min(w, 60))
 
@@ -609,7 +610,7 @@ def draw_git_cleanup_config(stdscr, enabled: bool) -> None:
     stdscr.erase()
     h, w = stdscr.getmaxyx()
 
-    header = "  claude-hooks · Hooks › Session Git Cleanup  "
+    header = "  fantasy-claude · Hooks › Session Git Cleanup  "
     stdscr.addstr(0, 0, header[:w], curses.A_BOLD)
     stdscr.addstr(1, 0, "─" * min(w, 60))
 
@@ -640,7 +641,7 @@ def draw_obsidian_instructions(stdscr, scroll: int) -> None:
     stdscr.erase()
     h, w = stdscr.getmaxyx()
     try:
-        stdscr.addstr(0, 0, "  claude-hooks · Integrations › Obsidian › Instructions  "[:w], curses.A_BOLD)
+        stdscr.addstr(0, 0, "  fantasy-claude · Integrations › Obsidian › Instructions  "[:w], curses.A_BOLD)
         stdscr.addstr(1, 0, "─" * min(w, 60))
     except curses.error:
         pass
@@ -679,7 +680,7 @@ def draw_obsidian_config(
     stdscr.erase()
     h, w = stdscr.getmaxyx()
     try:
-        stdscr.addstr(0, 0, "  claude-hooks · Integrations › Obsidian  "[:w], curses.A_BOLD)
+        stdscr.addstr(0, 0, "  fantasy-claude · Integrations › Obsidian  "[:w], curses.A_BOLD)
         stdscr.addstr(1, 0, "─" * min(w, 60))
     except curses.error:
         pass
@@ -763,7 +764,7 @@ def draw_screen(stdscr, title: str, items: list[str], cursor: int, hint: str = "
     h, w = stdscr.getmaxyx()
 
     # Header
-    header = f"  claude-hooks v{VERSION} · {title}  "
+    header = f"  fantasy-claude v{VERSION} · {title}  "
     stdscr.addstr(0, 0, header[:w], curses.A_BOLD)
     stdscr.addstr(1, 0, "─" * min(w, 60))
 
@@ -801,7 +802,7 @@ def draw_statusline_editor(
     h, w = stdscr.getmaxyx()
     n_lines = len(lines)
 
-    title = f"claude-hooks · Statusline · Line {current_line + 1} of {n_lines}"
+    title = f"fantasy-claude · Statusline · Line {current_line + 1} of {n_lines}"
     stdscr.addstr(0, 0, f"  {title}  "[:w], curses.A_BOLD)
     stdscr.addstr(1, 0, "─" * min(w, 60))
 
@@ -964,7 +965,7 @@ def draw_save_confirm(
     stdscr.erase()
     h, w = stdscr.getmaxyx()
 
-    title = "claude-hooks · Save Statusline"
+    title = "fantasy-claude · Save Statusline"
     stdscr.addstr(0, 0, f"  {title}  "[:w], curses.A_BOLD)
     stdscr.addstr(1, 0, "─" * min(w, 60))
 
@@ -1094,7 +1095,7 @@ def draw_element_config(
     stdscr.erase()
     h, w = stdscr.getmaxyx()
 
-    title = f"claude-hooks · Element: {element}"
+    title = f"fantasy-claude · Element: {element}"
     stdscr.addstr(0, 0, f"  {title}  "[:w], curses.A_BOLD)
     stdscr.addstr(1, 0, "─" * min(w, 60))
 
@@ -1250,7 +1251,7 @@ def draw_statusline_settings(
 ) -> None:
     stdscr.erase()
     h, w = stdscr.getmaxyx()
-    stdscr.addstr(0, 0, "  claude-hooks · Statusline Settings  "[:w], curses.A_BOLD)
+    stdscr.addstr(0, 0, "  fantasy-claude · Statusline Settings  "[:w], curses.A_BOLD)
     stdscr.addstr(1, 0, "─" * min(w, 60))
 
     # Section tabs

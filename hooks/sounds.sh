@@ -50,7 +50,10 @@ sound_file="$sound_dir/$sound_name.mp3"
 
 if [[ "$OSTYPE" == "darwin"* ]]; then
     afplay "$sound_file" &
+elif command -v paplay &>/dev/null; then
+    paplay "$sound_file" &
+elif command -v aplay &>/dev/null; then
+    aplay "$sound_file" &
 else
-    command -v paplay &>/dev/null && paplay "$sound_file" & || \
-    command -v aplay  &>/dev/null && aplay  "$sound_file" &
+    echo "WARNING: No audio player found. Install pulseaudio-utils (paplay) or alsa-utils (aplay)." >&2
 fi

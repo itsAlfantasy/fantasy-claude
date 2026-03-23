@@ -71,7 +71,7 @@ When the user switches branches, all scripts and `config.json` change instantly.
 
 ## Key Constants & Paths
 
-- Context window hard-coded to `200_000` tokens in `context-pct.sh`
+- Context window size is read from `CLAUDE_CONTEXT_SIZE` env var (set by `statusline.sh` from Claude Code's stdin JSON `context_window.context_window_size`); `200_000` is a dev/testing fallback only
 - Burn rate cache: `/tmp/claude_burn_cache_<uid>`
 - Session data: `~/.claude/projects/**/*.jsonl`
 - Colors: `green`, `red`, `orange`, `cyan`, `yellow`, `light gray`, `dark gray` (mapped to ANSI in `statusline.sh`)

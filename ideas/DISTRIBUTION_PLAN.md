@@ -1,6 +1,6 @@
 # Distribution Plan
 
-Piano per versionamento, release e distribuzione di claude-hooks.
+Piano per versionamento, release e distribuzione di fantasy-claude.
 
 ---
 
@@ -66,13 +66,13 @@ Il modo piu semplice. Crei uno script `install-remote.sh` nella repo:
 ```bash
 #!/bin/bash
 set -e
-INSTALL_DIR="$HOME/.claude-hooks"
+INSTALL_DIR="$HOME/.fantasy-claude"
 
 if [ -d "$INSTALL_DIR/.git" ]; then
-    echo "Updating claude-hooks..."
+    echo "Updating fantasy-claude..."
     git -C "$INSTALL_DIR" pull origin main
 else
-    echo "Installing claude-hooks..."
+    echo "Installing fantasy-claude..."
     git clone https://github.com/itsAlfantasy/fantasy-claude.git "$INSTALL_DIR"
 fi
 
@@ -99,7 +99,7 @@ Claude Code e un'app Node.js, quindi gli utenti hanno gia `npm`. E il canale piu
 1. Un `package.json`:
 ```json
 {
-  "name": "claude-hooks",
+  "name": "fantasy-claude",
   "version": "1.0.0",
   "description": "Statusline and sound hooks for Claude Code",
   "bin": {
@@ -176,7 +176,7 @@ Prima di qualsiasi distribuzione:
 
 1. **Aggiungi `LICENSE`** -- senza licenza il software non e tecnicamente open source. MIT e la scelta standard per tool CLI. Vai su GitHub > repo > Add file > "LICENSE" e scegli MIT, oppure crealo manualmente.
 
-2. **Verifica il nome su npm:** `npm view claude-hooks` -- se esiste, usa un nome alternativo.
+2. **Verifica il nome su npm:** `npm view fantasy-claude` -- se esiste, usa un nome alternativo.
 
 3. **Crea account npmjs.com** se non ne hai uno.
 
@@ -204,9 +204,9 @@ Per utenti che hanno installato via git clone:
 
 ```bash
 # Aggiungi a install.sh un flag "update"
-claude-hooks update
+fantasy-claude update
 # oppure
-cd ~/.claude-hooks && git pull && bash install.sh
+cd ~/.fantasy-claude && git pull && bash install.sh
 ```
 
 Per npm: `npm update -g fantasy-claude`
